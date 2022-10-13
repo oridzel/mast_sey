@@ -525,10 +525,10 @@ int main(int argc, char** argv)
         {
             progress = printStars(progress,i,ie_arr.size());
 
-            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
+            elas_arr.push_back(elas(ie_arr[i]+eg+evb,atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
+                elas_alloy_arr = elas(ie_arr[i]+eg+evb,atnum[ia],atcomp[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -540,8 +540,8 @@ int main(int argc, char** argv)
             {
                 if (ins)
                 {
-                    if (ie_arr[i] < eg+1e-4)
-                        inel_arr.push_back(inel(1e-11));
+                    if (ie_arr[i] < eg)
+                        inel_arr.push_back(inel(1e-15));
                     else
                         inel_arr.push_back(inel(ie_arr[i]+eg+evb));
                 }
@@ -549,8 +549,8 @@ int main(int argc, char** argv)
                     inel_arr.push_back(inel(ie_arr[i]));
                 if (ph)
                 {
-                    phon_plus_arr.push_back(phonon_plus(ie_arr[i]));
-                    phon_minus_arr.push_back(phonon_minus(ie_arr[i]));
+                    phon_plus_arr.push_back(phonon_plus(ie_arr[i]+eg+evb));
+                    phon_minus_arr.push_back(phonon_minus(ie_arr[i]+eg+evb));
                 }
             }
         }
