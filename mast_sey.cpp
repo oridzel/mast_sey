@@ -136,7 +136,7 @@ string checkName (string name);
 class Electron
 {
     public:
-        double e,de,iimfp,iemfp,itmfp,iphmfp_plus,iphmfp_minus,s_ef,s_u0,s_vb,s_eg,pathlength;
+        double e,de,iimfp,iemfp,itmfp,iphmfp_plus,iphmfp_minus,s_ef,pathlength;
         int secondary;
         double angles[2];
         double defl[2];
@@ -147,6 +147,9 @@ class Electron
         array<double,3> uvw{0.,0.,1.};
         vector<array<double,3> > coord;
         bool inside, dead;
+        // vector<double> sc_ph{0.};
+        // vector<double> sc_el{0.};
+        // vector<double> sc_in{0.};
     Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0)
     {
         e = ie;
@@ -163,20 +166,29 @@ class Electron
         }
         defl[0] = 0.0;
         defl[1] = 0.0;
-        iimfp = IIMFP();
-        iemfp = IEMFP();  
-        if (ph)
+        iemfp = IEMFP();
+        if (ins)
         {
-            iphmfp_plus = IPHMFP_plus();
-            iphmfp_minus = IPHMFP_minus();
-            if (e<eg) {
-                itmfp = iemfp+iphmfp_plus+iphmfp_minus;
-            } else {
-                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+            if (ph)
+            {
+                iphmfp_plus = IPHMFP_plus();
+                iphmfp_minus = IPHMFP_minus();
             }
+            else
+            {
+                iphmfp_plus = 0.0;
+                iphmfp_minus = 0.0;
+            }
+            if (e <= eg+1e-4) {
+                iimfp = 0.0;
+            } else {
+                iimfp = IIMFP();
+            }
+            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
         }
         else
         {
+            iimfp = IIMFP();
             itmfp = iemfp+iimfp;
             iphmfp_plus = 0.0;
             iphmfp_minus = 0.0;
@@ -215,17 +227,20 @@ class Electron
             sc_type_el = true;
             sc_type_ph = false;
             sc_type_elinel[0]++;
+            // sc_el.push_back(e);
         }
-        else if (rn <= (iemfp+iphmfp_plus+iphmfp_minus)/itmfp)
+        else if (ins && rn <= (iemfp+iphmfp_plus+iphmfp_minus)/itmfp)
         {
             sc_type_el = false;
             sc_type_ph = true;
+            // sc_ph.push_back(e);
         }
         else
         {
             sc_type_el = false;
             sc_type_ph = false;
             sc_type_elinel[1]++;
+            // sc_in.push_back(e);
         }
     }
 
@@ -244,126 +259,141 @@ class Electron
             defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
-        else
-        { 
-            if (sc_type_ph)
+        else if (sc_type_ph)
+        {
+            double detot_ph_plus_int = linterp2d(e,-1,ie_arr,phon_plus_arr,true);
+            double detot_ph_minus_int = linterp2d(e,-1,ie_arr,phon_minus_arr,true);
+            double total = 0.0;
+            double dummy = 0.0;
+            if (rn5 < detot_ph_plus_int/(detot_ph_plus_int+detot_ph_minus_int))
             {
-                double detot_ph_plus_int = linterp2d(e,-1,ie_arr,phon_plus_arr,true);
-                double detot_ph_minus_int = linterp2d(e,-1,ie_arr,phon_minus_arr,true);
-                double total = 0.0;
-                double dummy = 0.0;
-                if (rn5 < detot_ph_plus_int/(detot_ph_plus_int+detot_ph_minus_int))
+                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
+                for (size_t i = 0; i < ytup_intrp.size(); i++)
                 {
-                    vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
-                    for (size_t i = 0; i < ytup_intrp.size(); i++)
-                    {
-                        total += ytup_intrp[i][1];
-                    }
-                    for (size_t i = 0; i < ytup_intrp.size(); i++)
-                    {
-                        if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                        {
-                            de = ytup_intrp[i][0];
-                            break;
-                        }
-                        dummy += ytup_intrp[i][1];
-                    }
-                    e = e-de;
-                    died();
-                    if (! dead)
-                    {
-                        iemfp = IEMFP();
-                        iphmfp_plus = IPHMFP_plus();
-                        iphmfp_minus = IPHMFP_minus();
-                        iimfp = IIMFP();
-                        itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
-                    }
+                    total += ytup_intrp[i][1];
                 }
-                else
+                for (size_t i = 0; i < ytup_intrp.size(); i++)
                 {
-                    vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
-                    for (size_t i = 0; i < ytup_intrp.size(); i++)
+                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
                     {
-                        total += ytup_intrp[i][1];
+                        de = ytup_intrp[i][0];
+                        break;
                     }
-                    for (size_t i = 0; i < ytup_intrp.size(); i++)
-                    {
-                        if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                        {
-                            de = ytup_intrp[i][0];
-                            break;
-                        }
-                        dummy += ytup_intrp[i][1];
-                    }
-                    e = e+de;
-                    iemfp = IEMFP();
-                    iphmfp_plus = IPHMFP_plus();
-                    iphmfp_minus = IPHMFP_minus();
-                    iimfp = IIMFP();
-                    itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
-                }
-                return false;
-            }
-            else
-            {
-                double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-                de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
-                if (ins && de < eg)
-                {
-                    cout << "de = " << de << ", eg = " << eg << endl;
-                    // while (de < eg)
-                    // {
-                    //     rn3 = random01();
-                    //     de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
-                    // }
-                }
-                if (classical_ang)
-                {
-                    defl[0] = asin(sqrt(de/e));
-                }
-                else
-                {
-                    vector<array<double,2> > int_inelas_ang = int_inelastic_ang(&elfq,0.0,PI/2.,100,e,de,true);
-                    defl[0] = linterp(rn*int_inelas_ang[int_inelas_ang.size()-1][1],int_inelas_ang,true);
+                    dummy += ytup_intrp[i][1];
                 }
                 e = e-de;
                 died();
                 if (! dead)
                 {
-                    iimfp = IIMFP();
                     iemfp = IEMFP();
-                    if (ph)
+                    iphmfp_plus = IPHMFP_plus();
+                    iphmfp_minus = IPHMFP_minus();
+                    if (e <= eg+1e-4)
                     {
-                        iphmfp_plus = IPHMFP_plus();
-                        iphmfp_minus = IPHMFP_minus();
-                        itmfp = iemfp+iphmfp_plus+iphmfp_minus;
+                        iimfp = 0.0;
                     }
                     else
                     {
-                        itmfp = iemfp+iimfp;
+                        iimfp = IIMFP();
                     }
+                    itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
                 }
-                if (use_dos) 
+            }
+            else
+            {
+                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
+                for (size_t i = 0; i < ytup_intrp.size(); i++)
                 {
-                    if (feg_dos)
+                    total += ytup_intrp[i][1];
+                }
+                for (size_t i = 0; i < ytup_intrp.size(); i++)
+                {
+                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
                     {
-                        if (ins) {
-                            s_ef = fzero(&jdos,0.,evb,de,rn4);
-                        } else {
-                            s_ef = fzero(&jdos,0.,ef,de,rn4);
-                        }
+                        de = ytup_intrp[i][0];
+                        break;
+                    }
+                    dummy += ytup_intrp[i][1];
+                }
+                e = e+de;
+                iemfp = IEMFP();
+                iphmfp_plus = IPHMFP_plus();
+                iphmfp_minus = IPHMFP_minus();
+                if (e <= eg+1e-4)
+                {
+                    iimfp = 0.0;
+                }
+                else
+                {
+                    iimfp = IIMFP();
+                }
+                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+            }
+            return false;
+        }
+        else
+        {
+            double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
+            de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
+            if (ins && de < eg)
+            {
+                cout << "de = " << de << ", eg = " << eg << endl;
+                de = eg;
+            }
+            if (classical_ang)
+            {
+                defl[0] = asin(sqrt(de/e));
+            }
+            else
+            {
+                vector<array<double,2> > int_inelas_ang = int_inelastic_ang(&elfq,0.0,PI/2.,100,e,de,true);
+                defl[0] = linterp(rn*int_inelas_ang[int_inelas_ang.size()-1][1],int_inelas_ang,true);
+            }
+            e = e-de;
+            died();
+            if (! dead)
+            {
+                iemfp = IEMFP();
+                if (ph)
+                {
+                    iphmfp_plus = IPHMFP_plus();
+                    iphmfp_minus = IPHMFP_minus();
+                }
+                else
+                {
+                    iphmfp_plus = 0.0;
+                    iphmfp_minus = 0.0;
+                }
+                if (e <= eg+1e-4)
+                {
+                    iimfp = 0.0;
+                }
+                else
+                {
+                    iimfp = IIMFP();
+                }
+                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+            }
+            if (use_dos) 
+            {
+                if (feg_dos)
+                {
+                    if (ins) {
+                        s_ef = evb - fzero(&jdos,0.,evb,de,rn4);
                     } else {
-                        double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
-                        s_ef = linterp2d(de,rn4*s_ef_int,de_arr,jdos_arr,false,true);
+                        s_ef = fzero(&jdos,0.,ef,de,rn4);
                     }
                 } else {
-                    if (ins)
-                        s_ef = evb;
-                    else
-                        s_ef = ef;
+                    double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
+                    s_ef = linterp2d(de,rn4*s_ef_int,de_arr,jdos_arr,false,true);
                 }
-                return true;
+            } else {
+                if (ins)
+                    s_ef = 1e-4;
+                else
+                    s_ef = ef;
             }
+            return true;
         }
     }
 
@@ -508,11 +538,15 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                if (ie_arr[i] <= ebeg) {
-                    inel_arr.push_back(inel(ebeg));
-                } else {
-                    inel_arr.push_back(inel(ie_arr[i]));
+                if (ins)
+                {
+                    if (ie_arr[i] < eg+1e-4)
+                        inel_arr.push_back(inel(1e-11));
+                    else
+                        inel_arr.push_back(inel(ie_arr[i]+eg+evb));
                 }
+                else
+                    inel_arr.push_back(inel(ie_arr[i]));
                 if (ph)
                 {
                     phon_plus_arr.push_back(phonon_plus(ie_arr[i]));
@@ -663,8 +697,28 @@ int main(int argc, char** argv)
                                 }
                                 elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
                             }
-                            // valence band interaction
-                            else if (elec_arr[i].de+elec_arr[i].s_ef>u0)
+                            // valence band interaction (insulators)
+                            else if (ins && elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
+                            {
+                                s_ene = elec_arr[i].de-eg-elec_arr[i].s_ef;
+                                s_xyz[0] = elec_arr[i].xyz[0];
+                                s_xyz[1] = elec_arr[i].xyz[1];
+                                s_xyz[2] = elec_arr[i].xyz[2];
+                                if (spher_sec==1) {
+                                    s_uvw = { sin(acos(2.*rand01()-1.))*cos(2.*rand01()*PI),
+                                              sin(acos(2.*rand01()-1.))*sin(2.*rand01()*PI),
+                                              cos(acos(2.*rand01()-1.)) };
+                                } else  if (spher_sec==2) {
+                                    s_uvw = { sin(rand01()*PI)*cos(2.*rand01()*PI),
+                                              sin(rand01()*PI)*sin(2.*rand01()*PI),
+                                              cos(rand01()*PI) };
+                                } else {
+                                    s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
+                                }
+                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
+                            }
+                            // valence band interaction (metals)
+                            else if (!ins && elec_arr[i].de+elec_arr[i].s_ef>u0)
                             {
                                 s_ene = elec_arr[i].de+elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
@@ -695,6 +749,9 @@ int main(int argc, char** argv)
         vector<vector<array<double,3> > > coord_vec;
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
+        // vector<double> sc_el{0.};
+        // vector<double> sc_in{0.};
+        // vector<double> sc_ph{0.};
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
@@ -727,6 +784,12 @@ int main(int argc, char** argv)
             } else {
                 nem++; 
             }
+            // if (ei < 1000)
+            // {
+            //     sc_el.insert(sc_el.end(), elec_arr[ei].sc_el.begin(), elec_arr[ei].sc_el.end());
+            //     sc_in.insert(sc_in.end(), elec_arr[ei].sc_in.begin(), elec_arr[ei].sc_in.end());
+            //     sc_ph.insert(sc_ph.end(), elec_arr[ei].sc_ph.begin(), elec_arr[ei].sc_ph.end());
+            // }
         }
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
@@ -743,6 +806,9 @@ int main(int argc, char** argv)
         cout << setw(8) << (double)bsc/(double)mc_elec;
         cout << setw(8) << (double)d_prim/(double)mc_elec;
         cout << setw(8) << (double)e_bsc/(double)mc_elec << endl;
+        // saveVector(sc_el, checkName("mc_sc_el.plot"));
+        // saveVector(sc_in, checkName("mc_sc_in.plot"));
+        // saveVector(sc_ph, checkName("mc_sc_ph.plot"));
         return 0;
     }
     return 0;
@@ -767,7 +833,7 @@ void getInput(int argc, char** argv)
     if (strcmp(argv[1], "prepare") == 0) { prep = true; }
 
     if (ins) {
-        elow = eg+evb+1e-4;
+        elow = u0;
     } else {
         elow = ef+1e-4;
     }
@@ -786,7 +852,7 @@ void getInput(int argc, char** argv)
                     if (ebeg <= elow)
                     {
                         if (ins) {
-                            cout << "# WARNING: Initial energy too low, setting to E_gap + E_vb = " << (eg+evb)*HA2EV << "\n#" << endl;
+                            cout << "# WARNING: Initial energy too low, setting to 2*E_gap + E_vb = " << (2*eg+evb)*HA2EV << "\n#" << endl;
                         } else {
                             cout << "# WARNING: Initial energy too low, setting to E_fermi = " << ef*HA2EV << "\n#" << endl;
                         }
@@ -860,23 +926,6 @@ void getInput(int argc, char** argv)
         else
         {
             ph = false;
-        }
-
-        if (strcmp(argv[i], "-u") == 0)
-        {
-            if (argc > i+1)
-            {
-                if (argv[i+1][0] != '-')
-                {
-                    u0 = stod(argv[i+1])*EV2HA;
-                } else {
-                    cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
-                    exit(1);
-                }
-            } else {
-                cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
-                exit(1);
-            }
         }
 
         if (strcmp(argv[i], "-dircos") == 0)
@@ -1247,8 +1296,8 @@ void readMaterialFile(string filename)
         eg = EV2HA*eg;
         evb = EV2HA*evb;
         chi = EV2HA*chi;
-        u0 = eg+evb+chi;
-        ebeg = eg+evb+1e-4;
+        u0 = chi;
+        ebeg = u0;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
@@ -1827,19 +1876,17 @@ vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), doubl
     double a,b;
     double intgrl = 0.;
     vector<array<double,2> > int_arr;
-    // int_arr.push_back({0.,0.});
-    if (ins) {
-        int_arr.push_back({eg,0.});
-    } else {
-        int_arr.push_back({0.,0.});
-    }
+    int_arr.push_back({0.,0.});
     for (int i = 0; i < ndiv; i++)
     {
         a = (*f)(x,args,1);
         b = (*f)(x+dx,args,1);
         intgrl += (a+b)*dx*0.5;
         x = x+dx;
-        if (cumint) { int_arr.push_back({x,intgrl}); }
+        if (cumint)
+        {
+            int_arr.push_back({x,intgrl});
+        }
     }
     if (cumint) { return int_arr; }
     else
@@ -1889,7 +1936,7 @@ vector<array<double,2> > int_inelastic_ang(double (*f)(double,double,int), doubl
 vector<array<double,2> > inel(double ie)
 {
     vector<array<double,2> > iimfpint;
-    if (ie<1e-10)
+    if (ie<=1e-10)
     {
         for (int i = 0; i <= icsintgrid; i++)
         {
