@@ -91,6 +91,7 @@ vector<array<double,2> > elas(double ie, int at=0, double comp=1.0);
 vector<array<double,2> > inel(double ie);
 vector<array<double,2> > phonon_plus(double ie);
 vector<array<double,2> > phonon_minus(double ie);
+vector<array<double,2> > int_phonon_ang(double (*f)(double,double,double), double x0, double x1, double e, double e_, bool cumint=false);
 vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vector<double> &yarr, bool cumint=false);
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint=false);
 vector<array<double,2> > int_inelastic_ang(double (*f)(double,double,int), double x0, double x1, int ndiv, double ie, double de, bool cumint=false);
@@ -108,6 +109,7 @@ double spa_dispers(double w0, double w, double q);
 double spa_elf(double w, double q);
 double elfq(double q, double om, int dq=1);
 double qIntFun(double om, double ie, int dummy);
+double phonIntFun(double e, double e_, double theta);
 
 void prepareJDOS(const vector<array<double,2> > &dos);
 void saveVector(vector<double> arr, string filename);
@@ -285,6 +287,8 @@ class Electron
                 died();
                 if (! dead)
                 {
+                    vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
+                    defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
                     iemfp = IEMFP();
                     iphmfp_plus = IPHMFP_plus();
                     iphmfp_minus = IPHMFP_minus();
@@ -316,6 +320,8 @@ class Electron
                     dummy += ytup_intrp[i][1];
                 }
                 e = e+de;
+                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+                defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
                 iemfp = IEMFP();
                 iphmfp_plus = IPHMFP_plus();
                 iphmfp_minus = IPHMFP_minus();
@@ -1869,6 +1875,35 @@ vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vecto
     }
 }
 
+vector<array<double,2> > int_phonon_ang(double (*f)(double,double,double), double x0, double x1, double e, double e_, bool cumint)
+{
+    double x = x0;
+    int ndiv = 100;
+    double dx = (x1-x0)/ndiv;
+    double a,b;
+    double intgrl = 0.;
+    vector<array<double,2> > int_arr;
+    int_arr.push_back({0.,0.});
+    for (int i = 0; i < ndiv; i++)
+    {
+        x = x+dx;
+        a = (*f)(x,e,e_);
+        b = (*f)(x+dx,e,e_);
+        intgrl += (a+b)*dx*0.5;
+        if (cumint)
+        {
+            int_arr.push_back({x,intgrl});
+        }
+    }
+    if (cumint) { return int_arr; }
+    else
+    {
+        int_arr.clear();
+        int_arr.push_back({x1,intgrl});
+        return int_arr;
+    }
+}
+
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint)
 {
     double x = x0;
@@ -2214,6 +2249,17 @@ double elfq(double q, double om, int dq)
         exit(1);
         return 0.0;
     }
+}
+
+double phonIntFun(double e, double e_, double theta)
+{
+    double b;
+    double sigma;
+
+    b = log( (e+e_+2*sqrt(e*e_))/(e+e_-2*sqrt(e*e_)) ) * 1/2*sqrt(e*e_);
+    sigma = 1/b * sin(theta)/(e+e_-2*sqrt(e*e_)*cos(theta));
+
+    return sigma;
 }
 
 double qIntFun(double om, double ie, int dummy)
