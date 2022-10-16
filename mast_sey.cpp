@@ -143,15 +143,12 @@ class Electron
         double angles[2];
         double defl[2];
         bool sc_type_el;
-        bool sc_type_ph;
+        bool sc_type_ph_plus, sc_type_ph_minus;
         array<int,2> sc_type_elinel{0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
         vector<array<double,3> > coord;
         bool inside, dead;
-        // vector<double> sc_ph{0.};
-        // vector<double> sc_el{0.};
-        // vector<double> sc_in{0.};
     Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0)
     {
         e = ie;
@@ -229,20 +226,23 @@ class Electron
             sc_type_el = true;
             sc_type_ph = false;
             sc_type_elinel[0]++;
-            // sc_el.push_back(e);
+        }
+        else if (ins && rn <= (iemfp+iphmfp_plus)/itmfp)
+        {
+            sc_type_el = false;
+            sc_type_ph_plus = true;
         }
         else if (ins && rn <= (iemfp+iphmfp_plus+iphmfp_minus)/itmfp)
         {
             sc_type_el = false;
-            sc_type_ph = true;
-            // sc_ph.push_back(e);
+            sc_type_ph_minus = true;
         }
         else
         {
             sc_type_el = false;
-            sc_type_ph = false;
+            sc_type_ph_plus = false;
+            sc_type_ph_minus = false;
             sc_type_elinel[1]++;
-            // sc_in.push_back(e);
         }
     }
 
@@ -261,66 +261,29 @@ class Electron
             defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
-        else if (sc_type_ph)
+        else if (sc_type_ph_plus)
         {
-            double detot_ph_plus_int = linterp2d(e,-1,ie_arr,phon_plus_arr,true);
-            double detot_ph_minus_int = linterp2d(e,-1,ie_arr,phon_minus_arr,true);
             double total = 0.0;
             double dummy = 0.0;
-            if (rn5 < detot_ph_plus_int/(detot_ph_plus_int+detot_ph_minus_int))
+            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    total += ytup_intrp[i][1];
-                }
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                    {
-                        de = ytup_intrp[i][0];
-                        break;
-                    }
-                    dummy += ytup_intrp[i][1];
-                }
-                e = e-de;
-                died();
-                if (! dead)
-                {
-                    vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
-                    defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
-                    iemfp = IEMFP();
-                    iphmfp_plus = IPHMFP_plus();
-                    iphmfp_minus = IPHMFP_minus();
-                    if (e <= eg+1e-4)
-                    {
-                        iimfp = 0.0;
-                    }
-                    else
-                    {
-                        iimfp = IIMFP();
-                    }
-                    itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
-                }
+                total += ytup_intrp[i][1];
             }
-            else
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
+                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
                 {
-                    total += ytup_intrp[i][1];
+                    de = ytup_intrp[i][0];
+                    break;
                 }
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                    {
-                        de = ytup_intrp[i][0];
-                        break;
-                    }
-                    dummy += ytup_intrp[i][1];
-                }
-                e = e+de;
-                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+                dummy += ytup_intrp[i][1];
+            }
+            e = e-de;
+            died();
+            if (! dead)
+            {
+                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
                 defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
                 iemfp = IEMFP();
                 iphmfp_plus = IPHMFP_plus();
@@ -335,6 +298,39 @@ class Electron
                 }
                 itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
             }
+            return false;
+        }
+        else if (sc_type_ph_minus)
+        {
+            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                total += ytup_intrp[i][1];
+            }
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                {
+                    de = ytup_intrp[i][0];
+                    break;
+                }
+                dummy += ytup_intrp[i][1];
+            }
+            e = e+de;
+            vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+            defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
+            iemfp = IEMFP();
+            iphmfp_plus = IPHMFP_plus();
+            iphmfp_minus = IPHMFP_minus();
+            if (e <= eg+1e-4)
+            {
+                iimfp = 0.0;
+            }
+            else
+            {
+                iimfp = IIMFP();
+            }
+            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
             return false;
         }
         else
