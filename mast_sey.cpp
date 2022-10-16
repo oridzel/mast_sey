@@ -224,7 +224,8 @@ class Electron
         if (rn <= iemfp/itmfp)
         {
             sc_type_el = true;
-            sc_type_ph = false;
+            sc_type_ph_plus = false;
+            sc_type_ph_minus = false;
             sc_type_elinel[0]++;
         }
         else if (ins && rn <= (iemfp+iphmfp_plus)/itmfp)
@@ -302,6 +303,8 @@ class Electron
         }
         else if (sc_type_ph_minus)
         {
+            double total = 0.0;
+            double dummy = 0.0;
             vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
             for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
