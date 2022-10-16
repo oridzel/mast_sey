@@ -66,10 +66,16 @@ bool notir = false;
 bool test = false;
 double cc = 137.;
 
+// vector<double> sc_ph;
+// vector<double> sc_pol;
+// vector<double> sc_el;
+// vector<double> sc_in;
+
 bool ins = false;
 double eg, evb, chi;
 bool ph = false;
 double eps_zero, eps_inf;
+double s_trap, gamma_trap;
 vector <double> ph_loss;
 
 string getTime();
@@ -77,6 +83,7 @@ void getInput(int argc, char** argv);
 void printVersion(char** argv);
 void readMaterialFile(string filename="material.in");
 void readPhononFile(string filename="ph.in");
+void readPolaronFile(string filename="polaron.in");
 void readEpsFile(string filename="eps.in");
 vector<double> read1colFile(string filename="energies.in");
 vector<array<double,2> > read2colFile(string filename="dos.in");
@@ -138,20 +145,19 @@ string checkName (string name);
 class Electron
 {
     public:
-        double e,de,iimfp,iemfp,itmfp,iphmfp_plus,iphmfp_minus,s_ef,pathlength;
+        double e,de,iimfp,iemfp,itmfp,iphmfp_plus,iphmfp_minus,ipolmfp,s_ef,pathlength;
         int secondary;
         double angles[2];
         double defl[2];
         bool sc_type_el;
-        bool sc_type_ph;
+        bool sc_type_ph_plus;
+        bool sc_type_ph_minus;
+        bool sc_type_pol;
         array<int,2> sc_type_elinel{0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
         vector<array<double,3> > coord;
         bool inside, dead;
-        // vector<double> sc_ph{0.};
-        // vector<double> sc_el{0.};
-        // vector<double> sc_in{0.};
     Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0)
     {
         e = ie;
@@ -186,7 +192,8 @@ class Electron
             } else {
                 iimfp = IIMFP();
             }
-            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+            ipolmfp = IPOLMFP();
+            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
         }
         else
         {
@@ -194,6 +201,7 @@ class Electron
             itmfp = iemfp+iimfp;
             iphmfp_plus = 0.0;
             iphmfp_minus = 0.0;
+            ipolmfp = 0.0;
         }  
         inside = true;
         dead = false;
@@ -227,22 +235,44 @@ class Electron
         if (rn <= iemfp/itmfp)
         {
             sc_type_el = true;
-            sc_type_ph = false;
+            sc_type_ph_minus = false;
+            sc_type_ph_plus = false;
             sc_type_elinel[0]++;
-            // sc_el.push_back(e);
+            sc_type_pol = false;
+            // sc_el.push_back(e*HA2EV);
         }
-        else if (ins && rn <= (iemfp+iphmfp_plus+iphmfp_minus)/itmfp)
+        else if (rn <= (iemfp+iimfp)/itmfp)
         {
             sc_type_el = false;
-            sc_type_ph = true;
-            // sc_ph.push_back(e);
-        }
-        else
-        {
-            sc_type_el = false;
-            sc_type_ph = false;
+            sc_type_ph_minus = false;
+            sc_type_ph_plus = false;
+            sc_type_pol = false;
             sc_type_elinel[1]++;
-            // sc_in.push_back(e);
+            // sc_in.push_back(e*HA2EV);
+        }
+        else if (ins && rn <= (iemfp+iimfp+iphmfp_minus)/itmfp)
+        {
+            sc_type_el = false;
+            sc_type_ph_plus = false;
+            sc_type_ph_minus = true;
+            sc_type_pol = false;
+            // sc_ph.push_back(e*HA2EV);
+        }
+        else if (ins && rn <= (iemfp+iimfp+iphmfp_minus+iphmfp_plus)/itmfp)
+        {
+            sc_type_el = false;
+            sc_type_ph_plus = true;
+            sc_type_ph_minus = false;
+            sc_type_pol = false;
+            // sc_ph.push_back(e*HA2EV);
+        }
+        else if (ins && rn <= (iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp)/itmfp)
+        {
+            sc_type_pol = true;
+            sc_type_el = false;
+            sc_type_ph_minus = false;
+            sc_type_ph_plus = false;
+            // sc_pol.push_back(e*HA2EV);
         }
     }
 
@@ -252,7 +282,6 @@ class Electron
         double rn2 = random01();
         double rn3 = random01();
         double rn4 = random01();
-        double rn5 = random01();
         double rn6 = random01();
         defl[1] = rn*2.*PI;
         if (sc_type_el)
@@ -261,66 +290,29 @@ class Electron
             defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
-        else if (sc_type_ph)
+        else if (sc_type_ph_plus)
         {
-            double detot_ph_plus_int = linterp2d(e,-1,ie_arr,phon_plus_arr,true);
-            double detot_ph_minus_int = linterp2d(e,-1,ie_arr,phon_minus_arr,true);
             double total = 0.0;
             double dummy = 0.0;
-            if (rn5 < detot_ph_plus_int/(detot_ph_plus_int+detot_ph_minus_int))
+            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    total += ytup_intrp[i][1];
-                }
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                    {
-                        de = ytup_intrp[i][0];
-                        break;
-                    }
-                    dummy += ytup_intrp[i][1];
-                }
-                e = e-de;
-                died();
-                if (! dead)
-                {
-                    vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
-                    defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
-                    iemfp = IEMFP();
-                    iphmfp_plus = IPHMFP_plus();
-                    iphmfp_minus = IPHMFP_minus();
-                    if (e <= eg+1e-4)
-                    {
-                        iimfp = 0.0;
-                    }
-                    else
-                    {
-                        iimfp = IIMFP();
-                    }
-                    itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
-                }
+                total += ytup_intrp[i][1];
             }
-            else
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
+                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
                 {
-                    total += ytup_intrp[i][1];
+                    de = ytup_intrp[i][0];
+                    break;
                 }
-                for (size_t i = 0; i < ytup_intrp.size(); i++)
-                {
-                    if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
-                    {
-                        de = ytup_intrp[i][0];
-                        break;
-                    }
-                    dummy += ytup_intrp[i][1];
-                }
-                e = e+de;
-                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+                dummy += ytup_intrp[i][1];
+            }
+            e = e-de;
+            died();
+            if (! dead)
+            {
+                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
                 defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
                 iemfp = IEMFP();
                 iphmfp_plus = IPHMFP_plus();
@@ -333,8 +325,51 @@ class Electron
                 {
                     iimfp = IIMFP();
                 }
-                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+                ipolmfp = IPOLMFP();
+                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
+            }   
+            return false;
+        }
+        else if (sc_type_ph_minus)
+        {
+            double total = 0.0;
+            double dummy = 0.0;
+            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                total += ytup_intrp[i][1];
             }
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                {
+                    de = ytup_intrp[i][0];
+                    break;
+                }
+                dummy += ytup_intrp[i][1];
+            }
+            e = e+de;
+            vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+            defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
+            iemfp = IEMFP();
+            iphmfp_plus = IPHMFP_plus();
+            iphmfp_minus = IPHMFP_minus();
+            if (e <= eg+1e-4)
+            {
+                iimfp = 0.0;
+            }
+            else
+            {
+                iimfp = IIMFP();
+            }
+            ipolmfp = IPOLMFP();
+            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
+
+            return false;
+        }
+        else if (sc_type_pol)
+        {
+            dead = true;
             return false;
         }
         else
@@ -343,7 +378,7 @@ class Electron
             de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
             if (ins && de < eg)
             {
-                cout << "de = " << de << ", eg = " << eg << endl;
+                // cout << "de = " << de << ", eg = " << eg << endl;
                 de = eg;
             }
             if (classical_ang)
@@ -378,7 +413,8 @@ class Electron
                 {
                     iimfp = IIMFP();
                 }
-                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+                ipolmfp = IPOLMFP();
+                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
             }
             if (use_dos) 
             {
@@ -422,6 +458,11 @@ class Electron
     double IPHMFP_plus()
     {
         return linterp2d(e,-1,ie_arr,phon_plus_arr,true);
+    }
+
+    double IPOLMFP()
+    {
+        return s_trap*exp(-gamma_trap*e);
     }
 
     void escaped()
@@ -498,6 +539,7 @@ int main(int argc, char** argv)
     {
         readPhononFile();
     }
+    readPolaronFile();
     // ===================================
     readEpsFile(); // ??? we call it later for prep, delete?
     // ===================================
@@ -755,9 +797,6 @@ int main(int argc, char** argv)
         vector<vector<array<double,3> > > coord_vec;
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
-        // vector<double> sc_el{0.};
-        // vector<double> sc_in{0.};
-        // vector<double> sc_ph{0.};
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
@@ -790,12 +829,6 @@ int main(int argc, char** argv)
             } else {
                 nem++; 
             }
-            // if (ei < 1000)
-            // {
-            //     sc_el.insert(sc_el.end(), elec_arr[ei].sc_el.begin(), elec_arr[ei].sc_el.end());
-            //     sc_in.insert(sc_in.end(), elec_arr[ei].sc_in.begin(), elec_arr[ei].sc_in.end());
-            //     sc_ph.insert(sc_ph.end(), elec_arr[ei].sc_ph.begin(), elec_arr[ei].sc_ph.end());
-            // }
         }
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
@@ -815,6 +848,7 @@ int main(int argc, char** argv)
         // saveVector(sc_el, checkName("mc_sc_el.plot"));
         // saveVector(sc_in, checkName("mc_sc_in.plot"));
         // saveVector(sc_ph, checkName("mc_sc_ph.plot"));
+        // saveVector(sc_pol, checkName("mc_sc_pol.plot"));
         return 0;
     }
     return 0;
@@ -1324,6 +1358,14 @@ void readPhononFile(string filename)
         ph_loss.push_back(ph_tmp*EV2HA);
     }
     infile >> eps_zero >> eps_inf;
+}
+
+void readPolaronFile(string filename)
+{
+    ifstream infile(filename);
+    infile >> s_trap >> gamma_trap;
+    s_trap /= ANG2BOHR;
+    gamma_trap /= EV2HA;
 }
 
 void readEpsFile(string filename)
