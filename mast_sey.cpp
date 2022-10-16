@@ -150,9 +150,8 @@ class Electron
         double angles[2];
         double defl[2];
         bool sc_type_el;
-        bool sc_type_ph_plus;
-        bool sc_type_ph_minus;
         bool sc_type_pol;
+        bool sc_type_ph_plus, sc_type_ph_minus;
         array<int,2> sc_type_elinel{0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
@@ -282,7 +281,7 @@ class Electron
         double rn2 = random01();
         double rn3 = random01();
         double rn4 = random01();
-        double rn6 = random01();
+        double rn5 = random01();
         defl[1] = rn*2.*PI;
         if (sc_type_el)
         {
@@ -301,7 +300,7 @@ class Electron
             }
             for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
                 {
                     de = ytup_intrp[i][0];
                     break;
@@ -341,7 +340,7 @@ class Electron
             }
             for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                if (rn5 <= (ytup_intrp[i][1] + dummy)/total)
                 {
                     de = ytup_intrp[i][0];
                     break;
@@ -372,10 +371,45 @@ class Electron
             dead = true;
             return false;
         }
+        else if (sc_type_ph_minus)
+        {
+            double total = 0.0;
+            double dummy = 0.0;
+            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                total += ytup_intrp[i][1];
+            }
+            for (size_t i = 0; i < ytup_intrp.size(); i++)
+            {
+                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
+                {
+                    de = ytup_intrp[i][0];
+                    break;
+                }
+                dummy += ytup_intrp[i][1];
+            }
+            e = e+de;
+            vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
+            defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
+            iemfp = IEMFP();
+            iphmfp_plus = IPHMFP_plus();
+            iphmfp_minus = IPHMFP_minus();
+            if (e <= eg+1e-4)
+            {
+                iimfp = 0.0;
+            }
+            else
+            {
+                iimfp = IIMFP();
+            }
+            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
+            return false;
+        }
         else
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
+            de = linterp2d(e,rn4*detot_inel_int,ie_arr,inel_arr,false,true);
             if (ins && de < eg)
             {
                 // cout << "de = " << de << ", eg = " << eg << endl;
@@ -427,7 +461,7 @@ class Electron
                     }
                 } else {
                     double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
-                    s_ef = linterp2d(de,rn4*s_ef_int,de_arr,jdos_arr,false,true);
+                    s_ef = linterp2d(de,rn5*s_ef_int,de_arr,jdos_arr,false,true);
                 }
             } else {
                 if (ins)
