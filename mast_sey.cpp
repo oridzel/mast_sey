@@ -254,7 +254,6 @@ class Electron
         double rn3 = random01();
         double rn4 = random01();
         double rn5 = random01();
-        double rn6 = random01();
         defl[1] = rn*2.*PI;
         if (sc_type_el)
         {
@@ -273,7 +272,7 @@ class Electron
             }
             for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
                 {
                     de = ytup_intrp[i][0];
                     break;
@@ -312,7 +311,7 @@ class Electron
             }
             for (size_t i = 0; i < ytup_intrp.size(); i++)
             {
-                if (rn6 <= (ytup_intrp[i][1] + dummy)/total)
+                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
                 {
                     de = ytup_intrp[i][0];
                     break;
@@ -339,7 +338,7 @@ class Electron
         else
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e,rn3*detot_inel_int,ie_arr,inel_arr,false,true);
+            de = linterp2d(e,rn4*detot_inel_int,ie_arr,inel_arr,false,true);
             if (ins && de < eg)
             {
                 cout << "de = " << de << ", eg = " << eg << endl;
@@ -390,7 +389,7 @@ class Electron
                     }
                 } else {
                     double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
-                    s_ef = linterp2d(de,rn4*s_ef_int,de_arr,jdos_arr,false,true);
+                    s_ef = linterp2d(de,rn5*s_ef_int,de_arr,jdos_arr,false,true);
                 }
             } else {
                 if (ins)
