@@ -228,22 +228,24 @@ class Electron
             sc_type_ph_minus = false;
             sc_type_elinel[0]++;
         }
-        else if (ins && rn <= (iemfp+iphmfp_plus)/itmfp)
-        {
-            sc_type_el = false;
-            sc_type_ph_plus = true;
-        }
-        else if (ins && rn <= (iemfp+iphmfp_plus+iphmfp_minus)/itmfp)
-        {
-            sc_type_el = false;
-            sc_type_ph_minus = true;
-        }
-        else
+        else if (rn <= (iemfp+iimfp)/itmfp)
         {
             sc_type_el = false;
             sc_type_ph_plus = false;
             sc_type_ph_minus = false;
             sc_type_elinel[1]++;
+        }
+        else if (ins && rn <= (iemfp+iimfp+iphmfp_plus)/itmfp)
+        {
+            sc_type_el = false;
+            sc_type_ph_plus = true;
+            sc_type_ph_minus = false;
+        }
+        else if (ins && rn <= (iemfp+iimfp+iphmfp_plus+iphmfp_minus)/itmfp)
+        {
+            sc_type_el = false;
+            sc_type_ph_minus = true;
+            sc_type_ph_plus = false;
         }
     }
 
