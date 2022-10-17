@@ -106,7 +106,6 @@ vector<array<double,2> > cumintVect(const vector<array<double,2>> &xyarr);
 array<double,3> f_rotdircos(array<double,3> uvw, double ang0, double ang1);
 vector<array<double,2> > linterp2dline(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp(double x, const vector<array<double,2> > &xyarr, bool xfind=false);
-vector<array<double,2>> linterp1d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr, bool total=false, bool xfind=false);
 double linterp3d(double x0, double y0, double z0, const vector<double> &xarr, const vector<vector<vector<array<double,2> > > > &ytuparr, bool total, bool xfind);
 double fzero(double (*f)(double,double,double), double x0, double x1, double ww, double qq, double tol=1e-6);
@@ -606,11 +605,16 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-
-            elas_arr.push_back(elas(ie_arr[i]+eg+evb,atnum[0],atcomp[0]));
+            if (ins)
+                elas_arr.push_back(elas(ie_arr[i]+eg+evb,atnum[0],atcomp[0]));
+            else
+                elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                elas_alloy_arr = elas(ie_arr[i]+eg+evb,atnum[ia],atcomp[ia]);
+                if (ins)
+                    elas_alloy_arr = elas(ie_arr[i]+eg+evb,atnum[ia],atcomp[ia]);
+                else
+                    elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -820,10 +824,7 @@ int main(int argc, char** argv)
                                 elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
                             }
                         } 
-                        else if (elec_arr[i].sc_type_el)
-                        {
-                            elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
-                        }
+                        elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
                 }
             }
