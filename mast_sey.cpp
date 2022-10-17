@@ -106,6 +106,7 @@ vector<array<double,2> > cumintVect(const vector<array<double,2>> &xyarr);
 array<double,3> f_rotdircos(array<double,3> uvw, double ang0, double ang1);
 vector<array<double,2> > linterp2dline(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp(double x, const vector<array<double,2> > &xyarr, bool xfind=false);
+vector<array<double,2>> linterp1d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr, bool total=false, bool xfind=false);
 double linterp3d(double x0, double y0, double z0, const vector<double> &xarr, const vector<vector<vector<array<double,2> > > > &ytuparr, bool total, bool xfind);
 double fzero(double (*f)(double,double,double), double x0, double x1, double ww, double qq, double tol=1e-6);
