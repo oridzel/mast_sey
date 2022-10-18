@@ -63,7 +63,8 @@ bool classical_ang = false;
 bool use_dos = false;
 bool feg_dos = false;
 bool notir = false;
-bool test = false;
+bool step = true;
+bool polaron = false;
 double cc = 137.;
 
 // vector<double> sc_ph;
@@ -496,26 +497,32 @@ class Electron
 
     double IPOLMFP()
     {
-        return s_trap*exp(-gamma_trap*e);
+        if (polaron)
+            return s_trap*exp(-gamma_trap*e);
+        else
+            return 0.0;
     }
 
     void escaped()
     {
-        double rn = random01();
         double t;
         dircos2ang();
         if (xyz[2]<0.0)
         {
             double beta = PI-angles[0];
-            if (e*cos(beta)*cos(beta) > u0)
+            double ecos = e*cos(beta)*cos(beta);
+            if (ecos > u0)
             {
-                t = 4.*sqrt(1.-u0/(e*cos(beta)*cos(beta)))/pow((1.+sqrt(1.-u0/(e*cos(beta)*cos(beta)))),2);
+                if (step)
+                { t = 4.*sqrt(1.-u0/ecos)/pow((1.+sqrt(1.-u0/ecos)),2); }
+                else
+                { t = 1.-pow(wf,4)/(8.*pow(wf+(ecos-u0),3)+pow(wf,4)); }
             }
             else
             {
                 t = 0.;
             }
-            if (rn < t)
+            if (random01() < t)
             {
                 inside = false;
                 xyz[0] = xyz[0]+sin(beta)*cos(angles[1])*xyz[2]/cos(beta);
@@ -570,10 +577,9 @@ int main(int argc, char** argv)
     readMaterialFile();
     getInput(argc,argv);
     if (ph)
-    {
         readPhononFile();
-    }
-    readPolaronFile();
+    if (polaron)
+        readPolaronFile();
     // ===================================
     readEpsFile(); // ??? we call it later for prep, delete?
     // ===================================
@@ -990,7 +996,8 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-sphsec") == 0) { spher_sec = 1; }
         if (strcmp(argv[i], "-rndsec") == 0) { spher_sec = 2; }
         if (strcmp(argv[i], "-notir") == 0) { notir = true; }
-        if (strcmp(argv[i], "-test") == 0) { test = true; }
+        if (strcmp(argv[i], "-nostep") == 0) { step = false; }
+        if (strcmp(argv[i], "-polaron") == 0) { polaron = true; }
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
         if (strcmp(argv[i], "SOLID") == 0) { es_muffin = 1; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
@@ -2294,7 +2301,7 @@ double fpa_elf(double w, double q)
     return integ;
 }
 
-double dft_elf(double w, double q)
+double  dft_elf(double w, double q)
 {
     return linterp2d(q,w,q_arr,ene_elf,false,false);
 }
