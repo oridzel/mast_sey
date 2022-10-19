@@ -84,7 +84,6 @@ void getInput(int argc, char** argv);
 void printVersion(char** argv);
 void readMaterialFile(string filename="material.in");
 void readPhononFile(string filename="ph.in");
-void readPolaronFile(string filename="polaron.in");
 void readEpsFile(string filename="eps.in");
 vector<double> read1colFile(string filename="energies.in");
 vector<array<double,2> > read2colFile(string filename="dos.in");
@@ -578,11 +577,7 @@ int main(int argc, char** argv)
     getInput(argc,argv);
     if (ph)
         readPhononFile();
-    if (polaron)
-        readPolaronFile();
-    // ===================================
-    readEpsFile(); // ??? we call it later for prep, delete?
-    // ===================================
+    readEpsFile();
     if(noout) {
         cout.rdbuf(NULL);
     }
@@ -997,7 +992,6 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-rndsec") == 0) { spher_sec = 2; }
         if (strcmp(argv[i], "-notir") == 0) { notir = true; }
         if (strcmp(argv[i], "-nostep") == 0) { step = false; }
-        if (strcmp(argv[i], "-polaron") == 0) { polaron = true; }
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
         if (strcmp(argv[i], "SOLID") == 0) { es_muffin = 1; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
@@ -1009,6 +1003,25 @@ void getInput(int argc, char** argv)
         else
         {
             ph = false;
+        }
+
+        if (strcmp(argv[i], "-polaron") == 0)
+        {
+            polaron = true;
+            if (argc > i+2)
+            {
+                if (argv[i+1][0] != '-' && argv[i+2][0] != '-')
+                {
+                    s_trap = stod(argv[i+1])*BOHR2ANG;
+                    gamma_trap = stod(argv[i+2])*HA2EV;
+                } else {
+                    cerr << "Too few arguments for " << argv[i] << ", needs 2 arguments." << endl;
+                    exit(1);
+                }
+            } else {
+                cerr << "Too few arguments for " << argv[i] << ", needs 2 arguments." << endl;
+                exit(1);
+            }
         }
 
         if (strcmp(argv[i], "-dircos") == 0)
@@ -1401,14 +1414,6 @@ void readPhononFile(string filename)
         ph_loss.push_back(ph_tmp*EV2HA);
     }
     infile >> eps_zero >> eps_inf;
-}
-
-void readPolaronFile(string filename)
-{
-    ifstream infile(filename);
-    infile >> s_trap >> gamma_trap;
-    s_trap /= ANG2BOHR;
-    gamma_trap /= EV2HA;
 }
 
 void readEpsFile(string filename)
