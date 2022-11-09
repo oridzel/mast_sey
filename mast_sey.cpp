@@ -72,6 +72,7 @@ double cc = 137.;
 // vector<double> sc_el;
 // vector<double> sc_in;
 
+bool spec = false;
 bool ins = false;
 double eg, evb, chi;
 bool ph = false;
@@ -834,6 +835,7 @@ int main(int argc, char** argv)
         vector<vector<array<double,3> > > coord_vec;
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
+        vector<double> se_spec;
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
@@ -847,7 +849,11 @@ int main(int argc, char** argv)
                 em++; 
                 if (elec_arr[ei].e < 50.*EV2HA)
                 {
-                    tem++; 
+                    tem++;
+                    if (spec)
+                    {
+                        se_spec.push_back(elec_arr[ei].e*HA2EV);
+                    }
                     if (distrib)
                     {
                         ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
@@ -871,6 +877,10 @@ int main(int argc, char** argv)
         if (distrib)
         {
             saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
+        }
+        if (spec)
+        {
+            saveVector(se_spec,checkName("mc_se_spectrum.plot"));
         }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
@@ -995,6 +1005,7 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
         if (strcmp(argv[i], "SOLID") == 0) { es_muffin = 1; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
+        if (strcmp(argv[i], "-spec") == 0) { spec = true; }
 
         if (strcmp(argv[i], "-ph") == 0)
         {
