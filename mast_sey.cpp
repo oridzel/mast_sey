@@ -28,7 +28,7 @@ streambuf* orig_buf = cout.rdbuf();
 
 vector<double> ie_arr, q_arr, de_arr;
 vector<vector<array<double,2> > > inel_arr, phon_plus_arr, phon_minus_arr, elas_arr, ene_elf, jdos_arr;
-vector<array<double,2> > elas_alloy_arr, dos_arr;
+vector<array<double,2> > elas_alloy_arr, dos_arr, phdos_arr, phdos_cumint;
 
 int dircos_algo = 0;
 int spher_sec = 0;
@@ -64,8 +64,8 @@ bool use_dos = false;
 bool feg_dos = false;
 bool notir = false;
 bool step = true;
-bool polaron = false;
 double cc = 137.;
+double val_ele = -1.;
 
 // vector<double> sc_ph;
 // vector<double> sc_pol;
@@ -74,9 +74,9 @@ double cc = 137.;
 
 bool spec = false;
 bool ins = false;
-double eg, evb, chi;
-bool ph = false;
-double eps_zero, eps_inf;
+double eg = 0.0, evb = 0.0, eps0 = 0.0, epsinf = 0.0;
+
+bool polaron = false;
 double s_trap, gamma_trap;
 vector <double> ph_loss;
 
@@ -84,7 +84,6 @@ string getTime();
 void getInput(int argc, char** argv);
 void printVersion(char** argv);
 void readMaterialFile(string filename="material.in");
-void readPhononFile(string filename="ph.in");
 void readEpsFile(string filename="eps.in");
 vector<double> read1colFile(string filename="energies.in");
 vector<array<double,2> > read2colFile(string filename="dos.in");
@@ -97,9 +96,6 @@ vector<double> getDeArr();
 
 vector<array<double,2> > elas(double ie, int at=0, double comp=1.0);
 vector<array<double,2> > inel(double ie);
-vector<array<double,2> > phonon_plus(double ie);
-vector<array<double,2> > phonon_minus(double ie);
-vector<array<double,2> > int_phonon_ang(double (*f)(double,double,double), double x0, double x1, double e, double e_, bool cumint=false);
 vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vector<double> &yarr, bool cumint=false);
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint=false);
 vector<array<double,2> > int_inelastic_ang(double (*f)(double,double,int), double x0, double x1, int ndiv, double ie, double de, bool cumint=false);
@@ -146,13 +142,13 @@ string checkName (string name);
 class Electron
 {
     public:
-        double e,de,iimfp,iemfp,itmfp,iphmfp_plus,iphmfp_minus,ipolmfp,s_ef,pathlength;
+        double e,de,de_ph,iimfp,iemfp,itmfp,iphmfp,ipolmfp,s_ef,pathlength;
         int secondary;
         double angles[2];
         double defl[2];
         bool sc_type_el;
         bool sc_type_pol;
-        bool sc_type_ph_plus, sc_type_ph_minus;
+        bool sc_type_ph;
         array<int,2> sc_type_elinel{0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
@@ -177,30 +173,21 @@ class Electron
         iemfp = IEMFP();
         if (ins)
         {
-            if (ph)
-            {
-                iphmfp_plus = IPHMFP_plus();
-                iphmfp_minus = IPHMFP_minus();
-            }
-            else
-            {
-                iphmfp_plus = 0.0;
-                iphmfp_minus = 0.0;
-            }
+            de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            iphmfp = IPHMFP();
             if (e <= eg+1e-4) {
                 iimfp = 0.0;
             } else {
                 iimfp = IIMFP();
             }
             ipolmfp = IPOLMFP();
-            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
+            itmfp = iemfp+iimfp+iphmfp+ipolmfp;
         }
         else
         {
             iimfp = IIMFP();
             itmfp = iemfp+iimfp;
-            iphmfp_plus = 0.0;
-            iphmfp_minus = 0.0;
+            iphmfp = 0.0;
             ipolmfp = 0.0;
         }  
         inside = true;
@@ -235,8 +222,7 @@ class Electron
         if (rn <= iemfp/itmfp)
         {
             sc_type_el = true;
-            sc_type_ph_minus = false;
-            sc_type_ph_plus = false;
+            sc_type_ph = false;
             sc_type_elinel[0]++;
             sc_type_pol = false;
             // sc_el.push_back(e*HA2EV);
@@ -244,34 +230,23 @@ class Electron
         else if (rn <= (iemfp+iimfp)/itmfp)
         {
             sc_type_el = false;
-            sc_type_ph_minus = false;
-            sc_type_ph_plus = false;
+            sc_type_ph = false;
             sc_type_pol = false;
             sc_type_elinel[1]++;
             // sc_in.push_back(e*HA2EV);
         }
-        else if (ins && rn <= (iemfp+iimfp+iphmfp_minus)/itmfp)
+        else if (ins && rn <= (iemfp+iimfp+iphmfp)/itmfp)
         {
             sc_type_el = false;
-            sc_type_ph_plus = false;
-            sc_type_ph_minus = true;
+            sc_type_ph = true;
             sc_type_pol = false;
             // sc_ph.push_back(e*HA2EV);
         }
-        else if (ins && rn <= (iemfp+iimfp+iphmfp_minus+iphmfp_plus)/itmfp)
-        {
-            sc_type_el = false;
-            sc_type_ph_plus = true;
-            sc_type_ph_minus = false;
-            sc_type_pol = false;
-            // sc_ph.push_back(e*HA2EV);
-        }
-        else if (ins && rn <= (iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp)/itmfp)
+        else if (ins && rn <= (iemfp+iimfp+iphmfp+ipolmfp)/itmfp)
         {
             sc_type_pol = true;
             sc_type_el = false;
-            sc_type_ph_minus = false;
-            sc_type_ph_plus = false;
+            sc_type_ph = false;
             // sc_pol.push_back(e*HA2EV);
         }
     }
@@ -290,33 +265,17 @@ class Electron
             defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
-        else if (sc_type_ph_plus)
+        else if (sc_type_ph)
         {
-            double total = 0.0;
-            double dummy = 0.0;
-            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_plus_arr);
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                total += ytup_intrp[i][1];
-            }
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
-                {
-                    de = ytup_intrp[i][0];
-                    break;
-                }
-                dummy += ytup_intrp[i][1];
-            }
+            de = de_ph;
+            double bph = (e+e-de+2.0*sqrt(e*(e-de)))/(e+e-de-2.0*sqrt(e*(e-de)));
+            defl[0] = acos((e+e-de)/(2.0*sqrt(e*(e-de)))*(1.0-pow(bph,rn2))+pow(bph,rn2));
             e = e-de;
+            double rn3 = random01();
+            de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             died();
             if (! dead)
             {
-                vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e+de,e,true);
-                defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
-                iemfp = IEMFP();
-                iphmfp_plus = IPHMFP_plus();
-                iphmfp_minus = IPHMFP_minus();
                 if (e <= eg+1e-4)
                 {
                     iimfp = 0.0;
@@ -325,86 +284,16 @@ class Electron
                 {
                     iimfp = IIMFP();
                 }
+                iemfp = IEMFP();
+                iphmfp = IPHMFP();
                 ipolmfp = IPOLMFP();
-                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
-            }   
-            return false;
-        }
-        else if (sc_type_ph_minus)
-        {
-            double total = 0.0;
-            double dummy = 0.0;
-            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                total += ytup_intrp[i][1];
+                itmfp = iemfp+iimfp+iphmfp+ipolmfp;
             }
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                if (rn5 <= (ytup_intrp[i][1] + dummy)/total)
-                {
-                    de = ytup_intrp[i][0];
-                    break;
-                }
-                dummy += ytup_intrp[i][1];
-            }
-            e = e+de;
-            vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
-            defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
-            iemfp = IEMFP();
-            iphmfp_plus = IPHMFP_plus();
-            iphmfp_minus = IPHMFP_minus();
-            if (e <= eg+1e-4)
-            {
-                iimfp = 0.0;
-            }
-            else
-            {
-                iimfp = IIMFP();
-            }
-            ipolmfp = IPOLMFP();
-            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
-
             return false;
         }
         else if (sc_type_pol)
         {
             dead = true;
-            return false;
-        }
-        else if (sc_type_ph_minus)
-        {
-            double total = 0.0;
-            double dummy = 0.0;
-            vector<array<double,2>> ytup_intrp = linterp1d(e,-1,ie_arr,phon_minus_arr);
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                total += ytup_intrp[i][1];
-            }
-            for (size_t i = 0; i < ytup_intrp.size(); i++)
-            {
-                if (rn3 <= (ytup_intrp[i][1] + dummy)/total)
-                {
-                    de = ytup_intrp[i][0];
-                    break;
-                }
-                dummy += ytup_intrp[i][1];
-            }
-            e = e+de;
-            vector<array<double,2> > int_ph_ang = int_phonon_ang(&phonIntFun,0.0,PI/2.,e-de,e,true);
-            defl[0] = linterp(rn*int_ph_ang[int_ph_ang.size()-1][1],int_ph_ang,true);
-            iemfp = IEMFP();
-            iphmfp_plus = IPHMFP_plus();
-            iphmfp_minus = IPHMFP_minus();
-            if (e <= eg+1e-4)
-            {
-                iimfp = 0.0;
-            }
-            else
-            {
-                iimfp = IIMFP();
-            }
-            itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus;
             return false;
         }
         else
@@ -430,39 +319,40 @@ class Electron
             if (! dead)
             {
                 iemfp = IEMFP();
-                if (ph)
-                {
-                    iphmfp_plus = IPHMFP_plus();
-                    iphmfp_minus = IPHMFP_minus();
+                if (ins) {
+                    double rn4 = random01();
+                    de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                    iphmfp = IPHMFP();
+                    if (e <= eg+1e-4)
+                    {
+                        iimfp = 0.0;
+                    }
+                    else
+                    {
+                        iimfp = IIMFP();
+                    }
+                    ipolmfp = IPOLMFP();
+                    itmfp = iemfp+iimfp+iphmfp+ipolmfp;
                 }
                 else
-                {
-                    iphmfp_plus = 0.0;
-                    iphmfp_minus = 0.0;
-                }
-                if (e <= eg+1e-4)
-                {
-                    iimfp = 0.0;
-                }
-                else
-                {
-                    iimfp = IIMFP();
-                }
-                ipolmfp = IPOLMFP();
-                itmfp = iemfp+iimfp+iphmfp_plus+iphmfp_minus+ipolmfp;
+                    itmfp = iemfp+iimfp;
             }
             if (use_dos) 
             {
+                if (ins)
+                    ef = evb;
+                double rn5 = random01();
                 if (feg_dos)
                 {
-                    if (ins) {
-                        s_ef = evb - fzero(&jdos,0.,evb,de,rn4);
-                    } else {
-                        s_ef = fzero(&jdos,0.,ef,de,rn4);
-                    }
+                    s_ef = fzero(&jdos,0.,ef,de,rn5);
                 } else {
+                    double s_ef_int0 = 0.0;
+                    if (ef-de > 0)
+                    {
+                        s_ef_int0 = linterp2d(de,ef-de,de_arr,jdos_arr,true);
+                    }
                     double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
-                    s_ef = linterp2d(de,rn5*s_ef_int,de_arr,jdos_arr,false,true);
+                    s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
                 if (ins)
@@ -485,14 +375,18 @@ class Electron
         return linterp2d(e,-1,ie_arr,inel_arr,true);
     }
 
-    double IPHMFP_minus()
+    double IPHMFP()
     {
-        return linterp2d(e,-1,ie_arr,phon_minus_arr,true);
-    }
-
-    double IPHMFP_plus()
-    {
-        return linterp2d(e,-1,ie_arr,phon_plus_arr,true);
+        if (eg > 0.001) {
+        double dephe = (de_ph)/e;
+        double sq_e = sqrt(1-dephe);
+        double kbt = 9.445e-4; 
+        return (eps0-epsinf)/(eps0*epsinf)*dephe*
+        ((1.0/(exp(de_ph/kbt)-1))+1.0)/2*
+        log((1.0+sq_e)/(1.0-sq_e));
+        } else {
+            return 0;
+        }
     }
 
     double IPOLMFP()
@@ -576,8 +470,6 @@ int main(int argc, char** argv)
     }
     readMaterialFile();
     getInput(argc,argv);
-    if (ph)
-        readPhononFile();
     readEpsFile();
     if(noout) {
         cout.rdbuf(NULL);
@@ -636,11 +528,6 @@ int main(int argc, char** argv)
                 }
                 else
                     inel_arr.push_back(inel(ie_arr[i]));
-                if (ph)
-                {
-                    phon_plus_arr.push_back(phonon_plus(ie_arr[i]+eg+evb));
-                    phon_minus_arr.push_back(phonon_minus(ie_arr[i]+eg+evb));
-                }
             }
         }
         if (preprange)
@@ -651,11 +538,6 @@ int main(int argc, char** argv)
             if(!emfp_only)
             {
                 saveVector(inel_arr, "inelastic_"+er_str+".in");
-                if (ph)
-                {
-                    saveVector(phon_plus_arr, "phonon_plus_"+er_str+".in");
-                    saveVector(phon_minus_arr, "phonon_minus_"+er_str+".in");
-                }
             }
             saveMFP("mfp_"+er_str+".plot");
             cout << "\nFinished preparing input files, results in \"elastic_"+er_str+".in\", \"inelastic_"+er_str+".in\" and \"energies_"+er_str+".in\"" << endl;
@@ -666,11 +548,6 @@ int main(int argc, char** argv)
             if(!emfp_only)
             {
                 saveVector(inel_arr, "inelastic.in");
-                if (ph)
-                {
-                    saveVector(phon_plus_arr, "phonon_plus.in");
-                    saveVector(phon_minus_arr, "phonon_minus.in");
-                }
             }
             saveMFP("mfp.plot");
             cout << "\nFinished preparing input files, results in \"elastic.in\", \"inelastic.in\" and \"energies.in\"" << endl;
@@ -694,11 +571,6 @@ int main(int argc, char** argv)
         }
         elas_arr = readScatteringFile("elastic.in");
         inel_arr = readScatteringFile("inelastic.in");
-        if (ph)
-        {
-            phon_plus_arr = readScatteringFile("phonon_plus.in");
-            phon_minus_arr = readScatteringFile("phonon_minus.in");
-        }
         if (use_dos && !feg_dos)
         {
             ifstream dosfile("jdos.in");
@@ -714,6 +586,17 @@ int main(int argc, char** argv)
             print("# Secondaries generated from joint DOS provided by user in jdos.in");
         } else if (feg_dos){
             print("# Secondaries generated from joint DOS of a Free Electron Gas");
+        }
+        if (eg > 0.0)
+        {
+            if (eps0 <= 0.0 || epsinf <=0.0) { cerr << "For insulators eps_0 and eps_inf need to be provided" << endl; exit(1); }
+            phdos_arr = read2colFile("phdos.in");
+            phdos_cumint = cumintVect(phdos_arr);
+            print("# Insulator with phonon scattering energy loss included");
+            cout << "#" << endl;
+            cout << "#" << setw(9) << "EGap" << setw(9) << "Eps_0" << setw(9) << "Eps_inf" << endl;
+            cout << "#" << setw(9) << "[eV]" << endl;
+            cout << "#" << setw(9) << eg*HA2EV << setw(9) << eps0 << setw(9) << epsinf << "\n#" << endl;
         }
         if (spher_sec==1)
         {
@@ -1007,13 +890,21 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
         if (strcmp(argv[i], "-spec") == 0) { spec = true; }
 
-        if (strcmp(argv[i], "-ph") == 0)
+        if (strcmp(argv[i], "-vale") == 0)
         {
-            ph = true;
-        }
-        else
-        {
-            ph = false;
+            if (argc > i+1)
+            {
+                if (argv[i+1][0] != '-')
+                {
+                    val_ele = stod(argv[i+1]);
+                } else {
+                    cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
+                    exit(1);
+                }
+            } else {
+                cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
+                exit(1);
+            }
         }
 
         if (strcmp(argv[i], "-polaron") == 0)
@@ -1399,11 +1290,10 @@ void readMaterialFile(string filename)
         exit(1);
     }
     if (ins) {
-        infile >> vol >> eg >> evb >> chi;
+        infile >> vol >> eg >> evb >> u0 >> eps0 >> epsinf;;
         eg = EV2HA*eg;
         evb = EV2HA*evb;
-        chi = EV2HA*chi;
-        u0 = chi;
+        u0 = EV2HA*u0;
         ebeg = u0;
     } else {
         infile >> vol >> ef >> wf;
@@ -1413,18 +1303,6 @@ void readMaterialFile(string filename)
         ebeg = ef+1e-4;
     }
     vol = vol*ANG2BOHR*ANG2BOHR*ANG2BOHR;
-}
-
-void readPhononFile(string filename)
-{
-    ifstream infile(filename);
-    double ph_tmp;
-    while ( infile.peek() != '\n' )
-    {
-        infile >> ph_tmp;
-        ph_loss.push_back(ph_tmp*EV2HA);
-    }
-    infile >> eps_zero >> eps_inf;
 }
 
 void readEpsFile(string filename)
@@ -1639,9 +1517,9 @@ void printInput()
         if (eb>0.01)
         {
             if (ins) {
-                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Affinity" << setw(9) << "BindEne" << setw(9) << "IncAng "<< endl;
+                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Inner potential" << setw(9) << "BindEne" << setw(9) << "IncAng "<< endl;
                 cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << chi*HA2EV << setw(9) << eb*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
+                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << u0*HA2EV << setw(9) << eb*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
             } else {
                 cout << "#" << setw(9) << "EFermi" << setw(9) << "WorkFun" << setw(9) << "BindEne" << setw(9) << "IncAng "<< endl;
                 cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
@@ -1650,9 +1528,9 @@ void printInput()
         } else
         {
             if (ins) {
-                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Affinity" << setw(9) << "IncAng" << endl;
+                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Inner potential" << setw(9) << "IncAng" << endl;
                 cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << chi*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
+                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << u0*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
             } else {
                 cout << "#" << setw(9) << "EFermi" << setw(9) << "WorkFun" << setw(9) << "IncAng" << endl;
                 cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
@@ -1805,8 +1683,6 @@ void saveMFP(string filename)
     if (emfp_only)
     {
         outfile << "#Energy[eV] EMFP[A]" << endl;
-    } else if (ph) {
-        outfile << "#Energy[eV] IMFP[A] EMFP[A] PHMFP_PLUS[A] PHMFP_MINUS[A]" << endl;
     } else {
         outfile << "#Energy[eV] IMFP[A] EMFP[A]" << endl;
     }
@@ -1819,15 +1695,7 @@ void saveMFP(string filename)
         } else {
             double iemfp_e = linterp2d(ie_arr[ee],-1,ie_arr,elas_arr,true)/vol;
             double iimfp_e = linterp2d(ie_arr[ee],-1,ie_arr,inel_arr,true);
-            if (ph)
-            {
-                double iphmfp_plus_e = linterp2d(ie_arr[ee],-1,ie_arr,phon_plus_arr,true);
-                double iphmfp_minus_e = linterp2d(ie_arr[ee],-1,ie_arr,phon_minus_arr,true);
-                outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << " " << setprecision(17) << 1./iphmfp_plus_e*BOHR2ANG << " " << setprecision(17) << 1./iphmfp_minus_e*BOHR2ANG << endl;
-            }
-            else {
-                outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << endl;
-            }
+            outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << endl;
         }
     }
 }
@@ -1976,35 +1844,6 @@ vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vecto
     }
 }
 
-vector<array<double,2> > int_phonon_ang(double (*f)(double,double,double), double x0, double x1, double e, double e_, bool cumint)
-{
-    double x = x0;
-    int ndiv = 100;
-    double dx = (x1-x0)/ndiv;
-    double a,b;
-    double intgrl = 0.;
-    vector<array<double,2> > int_arr;
-    int_arr.push_back({0.,0.});
-    for (int i = 0; i < ndiv; i++)
-    {
-        x = x+dx;
-        a = (*f)(x,e,e_);
-        b = (*f)(x+dx,e,e_);
-        intgrl += (a+b)*dx*0.5;
-        if (cumint)
-        {
-            int_arr.push_back({x,intgrl});
-        }
-    }
-    if (cumint) { return int_arr; }
-    else
-    {
-        int_arr.clear();
-        int_arr.push_back({x1,intgrl});
-        return int_arr;
-    }
-}
-
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint)
 {
     double x = x0;
@@ -2091,52 +1930,6 @@ vector<array<double,2> > inel(double ie)
         }
     }
     return iimfpint;
-}
-
-vector<array<double,2> > phonon_plus(double ie)
-{
-    double t = 300.0;
-    double k_b = 8.617e-5;
-    double n_lo, ln_plus, term_plus;
-    vector<array<double,2> > iphmfp_plus;
-    if (ie<1e-10)
-    {
-        iphmfp_plus.push_back({0.0,0.0});
-    }
-    else
-    {
-        for (size_t i = 0; i < ph_loss.size(); i++)
-        {
-            n_lo = 1.0/(exp(ph_loss[i]/(k_b*t))-1.0);
-            ln_plus = (1.0 + sqrt(abs(1.0 - ph_loss[i]/ie))) / (1.0 - sqrt(abs(1.0 - ph_loss[i]/ie)));
-            term_plus = (n_lo + 1.0)*(1.0/eps_inf - 1.0/eps_zero)*ph_loss[i]/(2.0*ie);
-            iphmfp_plus.push_back({ph_loss[i], term_plus*log(ln_plus)});
-        }
-    }
-    return iphmfp_plus;
-}
-
-vector<array<double,2> > phonon_minus(double ie)
-{
-    double t = 300.0;
-    double k_b = 8.617e-5;
-    double n_lo, ln_minus, term_minus;
-    vector<array<double,2> > iphmfp_minus;
-    if (ie<1e-10)
-    {
-        iphmfp_minus.push_back({0.0,0.0});
-    }
-    else
-    {
-        for (size_t i = 0; i < ph_loss.size(); i++)
-        {
-            n_lo = 1.0/(exp(ph_loss[i]/(k_b*t))-1.0);
-            ln_minus = (1.0 + sqrt(abs(1.0 + ph_loss[i]/ie))) / (-1.0 + sqrt(abs(1.0 + ph_loss[i]/ie)));
-            term_minus = n_lo*(1.0/eps_inf - 1.0/eps_zero)*ph_loss[i]/(2.0*ie);
-            iphmfp_minus.push_back({ph_loss[i], term_minus*log(ln_minus)});
-        }
-    }
-    return iphmfp_minus;
 }
 
 vector<vector<array<double,2> > > inelang(double ie)
