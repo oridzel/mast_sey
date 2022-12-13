@@ -70,7 +70,7 @@ bool use_dos = false;
 bool feg_dos = false;
 bool notir = false;
 
-bool spec = false;
+bool coin = false;
 bool ins = false;
 double eg = 0.0, eps0 = 0.0, epsinf = 0.0;
 bool polaron = false;
@@ -236,8 +236,8 @@ class Electron
         }
         else if (sc_type == 1)
         {
-            double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
+            double detot_inel_int = linterp2d(e+ef,-1,ie_arr,inel_arr,true);
+            de = linterp2d(e+ef,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
             if (ins && de < eg)
             {
                 // cout << "de = " << de << ", eg = " << eg << endl;
@@ -698,7 +698,7 @@ int main(int argc, char** argv)
                         elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
                 }
-                if (! elec_arr[i].dead && ! elec_arr[i].inside)
+                if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
                 {
                     if (!elec_arr[i].isse)
                     {
@@ -759,7 +759,8 @@ int main(int argc, char** argv)
             // saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
             saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
         }
-        saveVector(coin_arr,checkName("mc_coin.plot"),2);
+        if (coin)
+            saveVector(coin_arr,checkName("mc_coin.plot"),2);
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     SEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
@@ -794,7 +795,7 @@ void getInput(int argc, char** argv)
     if (strcmp(argv[1], "prepare") == 0) { prep = true; }
 
     if (ins) {
-        elow = EV2HA*5+1e-4;
+        elow = EV2HA*1+1e-4;
     } else {
         elow = ef+1e-4;
     }
@@ -870,6 +871,7 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-notir") == 0) { notir = true; }
         if (strcmp(argv[i], "-nostep") == 0) { step = false; }
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
+        if (strcmp(argv[i], "-coin") == 0) { coin = true; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
 
         if (strcmp(argv[i], "SOLID") == 0)
@@ -1306,7 +1308,7 @@ void readMaterialFile(string filename)
         eg = EV2HA*eg;
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = EV2HA*5+1e-4;
+        ebeg = EV2HA*1+1e-4;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
