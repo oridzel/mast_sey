@@ -7,6 +7,7 @@
 #include <ctime>
 #include <chrono>
 #include <string.h>
+#include <unistd.h>
 #include <array>
 
 #define PI 3.14159265359
@@ -14,20 +15,19 @@
 #define EV2HA 1/27.21138602
 #define ANG2BOHR 1/0.5291772109
 #define BOHR2ANG 0.5291772109
+#define CC 18778.865296
+#define C_AT 137.036
 
 using namespace std;
-string code_version = "4.1 (04-05-2022)";
+string code_version = "6.3 (21-Oct-2022)";
 vector<string> elems = {"XX","H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe","Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn","Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr","Rf","Db","Sg","Bh","Hs","Mt","Ds","Rg","Cn","Nh","Fl","Mc","Lv","Ts","Og"};
-
 
 random_device rd;
 mt19937 mt(rd());
-
 streambuf* orig_buf = cout.rdbuf();
 
-
 vector<double> ie_arr, q_arr, de_arr;
-vector<vector<array<double,2> > > inel_arr, phon_plus_arr, phon_minus_arr, elas_arr, ene_elf, jdos_arr;
+vector<vector<array<double,2> > > inel_arr, elas_arr, ene_elf, jdos_arr;
 vector<array<double,2> > elas_alloy_arr, dos_arr, phdos_arr, phdos_cumint;
 
 int dircos_algo = 0;
@@ -35,9 +35,14 @@ int spher_sec = 0;
 char dirname[100];
 vector <int> atnum;
 vector <double> atcomp;
+vector <double> atrmuf = {-1.0};
 double mass, rho, ef, wf, u0, vol;
 double ini_angle = 0.0;
-double eb = 0.;
+vector <double> eb_arr;
+vector <double> ebfr_arr;
+double eb = 0.0;
+double eb_fr = 0.0;
+double reb, sum_ebfr, val_ele = -1.;
 double erange = 1000.*EV2HA;
 double ebeg = 0.0;
 int egrid = 500, icsintgrid = 1000, qintgrid = 100, qdepgrid = 100, qdepomgrid = 1000;
@@ -50,6 +55,7 @@ bool elsepa = false;
 int es_nuc = 3, es_el = 1, es_ex = 1, es_muffin = 0, es_mcpol = 0;
 bool emfp_only = false;
 bool fermi_only = false;
+bool step =  true;
 bool prep = false;
 bool preprange = false;
 bool save_sumr = false;
@@ -63,22 +69,12 @@ bool classical_ang = false;
 bool use_dos = false;
 bool feg_dos = false;
 bool notir = false;
-bool step = true;
-double cc = 137.;
-double val_ele = -1.;
-
-// vector<double> sc_ph;
-// vector<double> sc_pol;
-// vector<double> sc_el;
-// vector<double> sc_in;
 
 bool spec = false;
 bool ins = false;
-double eg = 0.0, evb = 0.0, eps0 = 0.0, epsinf = 0.0;
-
+double eg = 0.0, eps0 = 0.0, epsinf = 0.0;
 bool polaron = false;
-double s_trap, gamma_trap;
-vector <double> ph_loss;
+double s_trap = 0.0, gamma_trap = 0.0;
 
 string getTime();
 void getInput(int argc, char** argv);
@@ -94,7 +90,7 @@ vector<double> range(double a, double b, int n);
 vector<double> logrange(double a, double b, int n);
 vector<double> getDeArr();
 
-vector<array<double,2> > elas(double ie, int at=0, double comp=1.0);
+vector<array<double,2> > elas(double ie, int at=0, double comp=1.0, double rmuf=-1.0);
 vector<array<double,2> > inel(double ie);
 vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vector<double> &yarr, bool cumint=false);
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint=false);
@@ -103,7 +99,6 @@ vector<array<double,2> > cumintVect(const vector<array<double,2>> &xyarr);
 array<double,3> f_rotdircos(array<double,3> uvw, double ang0, double ang1);
 vector<array<double,2> > linterp2dline(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp(double x, const vector<array<double,2> > &xyarr, bool xfind=false);
-vector<array<double,2>> linterp1d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr);
 double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr, bool total=false, bool xfind=false);
 double linterp3d(double x0, double y0, double z0, const vector<double> &xarr, const vector<vector<vector<array<double,2> > > > &ytuparr, bool total, bool xfind);
 double fzero(double (*f)(double,double,double), double x0, double x1, double ww, double qq, double tol=1e-6);
@@ -113,7 +108,6 @@ double spa_dispers(double w0, double w, double q);
 double spa_elf(double w, double q);
 double elfq(double q, double om, int dq=1);
 double qIntFun(double om, double ie, int dummy);
-double phonIntFun(double e, double e_, double theta);
 
 void prepareJDOS(const vector<array<double,2> > &dos);
 void saveVector(vector<double> arr, string filename);
@@ -128,7 +122,7 @@ void saveCoordVector(vector<vector<array<double,3> > > arr, vector<int> second, 
 void printVector(vector<double> &arr);
 void printVector(vector<array<double,2> > &arr);
 void printVector(vector<vector<array<double,2> > > &arr);
-void marker(string num);
+void marker(int num);
 void print(string text);
 void print(int num);
 void print(double num);
@@ -146,15 +140,13 @@ class Electron
         int secondary;
         double angles[2];
         double defl[2];
-        bool sc_type_el;
-        bool sc_type_pol;
-        bool sc_type_ph;
-        array<int,2> sc_type_elinel{0,0};
+        int sc_type;
+        array<int,4> sc_type_counts{0,0,0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
         vector<array<double,3> > coord;
-        bool inside, dead;
-    Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0)
+        bool inside, dead, isse;
+    Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0, bool se=false)
     {
         e = ie;
         de = 0.0;
@@ -164,6 +156,7 @@ class Electron
         uvw[0] = u;
         uvw[1] = v;
         uvw[2] = w;
+        isse = se;
         if (save_coords)
         {
             coord.push_back(xyz);
@@ -171,29 +164,18 @@ class Electron
         defl[0] = 0.0;
         defl[1] = 0.0;
         iemfp = IEMFP();
+        iimfp = IIMFP();
+        iphmfp = 0.0;
+        ipolmfp = IPOLMFP();
         if (ins)
         {
             de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             iphmfp = IPHMFP();
-            if (e <= eg+1e-4) {
-                iimfp = 0.0;
-            } else {
-                iimfp = IIMFP();
-            }
-            ipolmfp = IPOLMFP();
-            itmfp = iemfp+iimfp+iphmfp+ipolmfp;
         }
-        else
-        {
-            iimfp = IIMFP();
-            itmfp = iemfp+iimfp;
-            iphmfp = 0.0;
-            ipolmfp = 0.0;
-        }  
+        itmfp = iemfp+iimfp+iphmfp+ipolmfp;
         inside = true;
         dead = false;
         secondary = sec;
-
         pathlength = 0.0;
     }
     void travel_s()
@@ -219,35 +201,25 @@ class Electron
     void determ_scatter()
     {
         double rn = random01();
-        if (rn <= iemfp/itmfp)
+        if (rn < iemfp/itmfp)
         {
-            sc_type_el = true;
-            sc_type_ph = false;
-            sc_type_elinel[0]++;
-            sc_type_pol = false;
-            // sc_el.push_back(e*HA2EV);
+            sc_type = 0;
+            sc_type_counts[0]++;
         }
-        else if (rn <= (iemfp+iimfp)/itmfp)
+        else if (rn < (iemfp+iimfp)/itmfp)
         {
-            sc_type_el = false;
-            sc_type_ph = false;
-            sc_type_pol = false;
-            sc_type_elinel[1]++;
-            // sc_in.push_back(e*HA2EV);
+            sc_type = 1;
+            sc_type_counts[1]++;
         }
-        else if (ins && rn <= (iemfp+iimfp+iphmfp)/itmfp)
+        else if (rn < (iemfp+iimfp+iphmfp)/itmfp)
         {
-            sc_type_el = false;
-            sc_type_ph = true;
-            sc_type_pol = false;
-            // sc_ph.push_back(e*HA2EV);
+            sc_type = 2;
+            sc_type_counts[2]++;
         }
-        else if (ins && rn <= (iemfp+iimfp+iphmfp+ipolmfp)/itmfp)
+        else
         {
-            sc_type_pol = true;
-            sc_type_el = false;
-            sc_type_ph = false;
-            // sc_pol.push_back(e*HA2EV);
+            sc_type = 3;
+            sc_type_counts[3]++;
         }
     }
 
@@ -255,92 +227,43 @@ class Electron
     {
         double rn = random01();
         double rn2 = random01();
-        double rn3 = random01();
-        double rn4 = random01();
-        double rn5 = random01();
         defl[1] = rn*2.*PI;
-        if (sc_type_el)
+        if (sc_type == 0)
         {
             double tot_elast_int = linterp2d(e,-1,ie_arr,elas_arr,true);
             defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
-        else if (sc_type_ph)
-        {
-            de = de_ph;
-            double bph = (e+e-de+2.0*sqrt(e*(e-de)))/(e+e-de-2.0*sqrt(e*(e-de)));
-            defl[0] = acos((e+e-de)/(2.0*sqrt(e*(e-de)))*(1.0-pow(bph,rn2))+pow(bph,rn2));
-            e = e-de;
-            double rn3 = random01();
-            de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
-            died();
-            if (! dead)
-            {
-                if (e <= eg+1e-4)
-                {
-                    iimfp = 0.0;
-                }
-                else
-                {
-                    iimfp = IIMFP();
-                }
-                iemfp = IEMFP();
-                iphmfp = IPHMFP();
-                ipolmfp = IPOLMFP();
-                itmfp = iemfp+iimfp+iphmfp+ipolmfp;
-            }
-            return false;
-        }
-        else if (sc_type_pol)
-        {
-            dead = true;
-            return false;
-        }
-        else
+        else if (sc_type == 1)
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e,rn4*detot_inel_int,ie_arr,inel_arr,false,true);
-            if (ins && de < eg)
-            {
-                // cout << "de = " << de << ", eg = " << eg << endl;
-                de = eg;
-            }
+            de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
             if (classical_ang)
             {
                 defl[0] = asin(sqrt(de/e));
             }
             else
             {
+                double rn3 = random01();
                 vector<array<double,2> > int_inelas_ang = int_inelastic_ang(&elfq,0.0,PI/2.,100,e,de,true);
-                defl[0] = linterp(rn*int_inelas_ang[int_inelas_ang.size()-1][1],int_inelas_ang,true);
+                defl[0] = linterp(rn3*int_inelas_ang[int_inelas_ang.size()-1][1],int_inelas_ang,true);
             }
             e = e-de;
+            if (eg>0.001) {
+                double rn4 = random01();
+                de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            }
             died();
             if (! dead)
             {
+                iimfp = IIMFP();
                 iemfp = IEMFP();
-                if (ins) {
-                    double rn4 = random01();
-                    de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
-                    iphmfp = IPHMFP();
-                    if (e <= eg+1e-4)
-                    {
-                        iimfp = 0.0;
-                    }
-                    else
-                    {
-                        iimfp = IIMFP();
-                    }
-                    ipolmfp = IPOLMFP();
-                    itmfp = iemfp+iimfp+iphmfp+ipolmfp;
-                }
-                else
-                    itmfp = iemfp+iimfp;
+                iphmfp = IPHMFP();
+                ipolmfp = IPOLMFP();
+                itmfp = iemfp+iimfp+iphmfp+ipolmfp;
             }
             if (use_dos) 
             {
-                if (ins)
-                    ef = evb;
                 double rn5 = random01();
                 if (feg_dos)
                 {
@@ -356,12 +279,38 @@ class Electron
                 }
             } else {
                 if (ins)
-                    s_ef = 1e-4;
+                    s_ef = 0;
                 else
                     s_ef = ef;
             }
             return true;
         }
+        else if (sc_type == 2)
+        {
+            de = de_ph;
+            double bph = (e+e-de+2.0*sqrt(e*(e-de)))/(e+e-de-2.0*sqrt(e*(e-de)));
+            defl[0] = acos((e+e-de)/(2.0*sqrt(e*(e-de)))*(1.0-pow(bph,rn2))+pow(bph,rn2));
+            e = e-de;
+            double rn3 = random01();
+            de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            died();
+            if (! dead)
+            {
+                iimfp = IIMFP();
+                iemfp = IEMFP();
+                iphmfp = IPHMFP();
+                ipolmfp = IPOLMFP();
+                itmfp = iemfp+iimfp+iphmfp+ipolmfp;
+            }
+            return false;
+        }
+        else if (sc_type == 3)
+        {
+            e = 0.0;
+            died();
+            return false;
+        }
+        return false;
     }
 
     double IEMFP()
@@ -377,13 +326,12 @@ class Electron
 
     double IPHMFP()
     {
-        if (eg > 0.001) {
-        double dephe = (de_ph)/e;
-        double sq_e = sqrt(1-dephe);
-        double kbt = 9.445e-4; 
-        return (eps0-epsinf)/(eps0*epsinf)*dephe*
-        ((1.0/(exp(de_ph/kbt)-1))+1.0)/2*
-        log((1.0+sq_e)/(1.0-sq_e));
+        if (ins)
+        {
+            double dephe = (de_ph)/e;
+            double sq_e = sqrt(1-dephe);
+            double kbt = 9.445e-4; 
+            return (eps0-epsinf)/(eps0*epsinf)*dephe*((1.0/(exp(de_ph/kbt)-1))+1.0)/2*log((1.0+sq_e)/(1.0-sq_e));
         } else {
             return 0;
         }
@@ -391,7 +339,7 @@ class Electron
 
     double IPOLMFP()
     {
-        if (polaron)
+        if (polaron && ins)
             return s_trap*exp(-gamma_trap*e);
         else
             return 0.0;
@@ -500,16 +448,10 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            if (ins)
-                elas_arr.push_back(elas(ie_arr[i]+eg+evb,atnum[0],atcomp[0]));
-            else
-                elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
+            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0],atrmuf[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                if (ins)
-                    elas_alloy_arr = elas(ie_arr[i]+eg+evb,atnum[ia],atcomp[ia]);
-                else
-                    elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
+                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia],atrmuf[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -519,15 +461,7 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                if (ins)
-                {
-                    if (ie_arr[i] < eg)
-                        inel_arr.push_back(inel(1e-15));
-                    else
-                        inel_arr.push_back(inel(ie_arr[i]+eg+evb));
-                }
-                else
-                    inel_arr.push_back(inel(ie_arr[i]));
+                inel_arr.push_back(inel(ie_arr[i]+eg+ef)); //+eg+ef
             }
         }
         if (preprange)
@@ -553,12 +487,12 @@ int main(int argc, char** argv)
             cout << "\nFinished preparing input files, results in \"elastic.in\", \"inelastic.in\" and \"energies.in\"" << endl;
         }
 
-        system("rm *dat elsepa.in");
+        system("rm *dat elsepa.in z_*.den");
         return 0;
     }
     else
     {
-        erange = erange+u0; 
+        erange = erange+u0;
         ie_arr = read1colFile();
         if (erange>=ie_arr[ie_arr.size()-1])
         {
@@ -575,6 +509,22 @@ int main(int argc, char** argv)
         {
             ifstream dosfile("jdos.in");
             dos_arr = read2colFile("dos.in");
+            if (val_ele < 0 && eb_arr.size() > 0)
+            {
+                val_ele = 0;
+                for (size_t i_dos=0; i_dos<dos_arr.size(); i_dos++)
+                {
+                    val_ele += (dos_arr[i_dos+1][0]-dos_arr[i_dos][0])*dos_arr[i_dos][1];
+                    if (dos_arr[i_dos+1][0]>ef) { break; }
+                }
+                cout << "#" << setw(9) << "valence" << setprecision(4) << setw(7) << val_ele << endl;
+                print("# No. of valence e- determined automatically.");
+                cout << "#" << endl;
+            } else if (eb_arr.size() > 0 && val_ele > 0)
+            {
+                cout << "#" << setw(9) << "valence" << setprecision(4) << setw(7) << val_ele << endl;
+                cout << "#" << endl;
+            }
             de_arr = getDeArr();
             if (!dosfile)
             {
@@ -587,7 +537,12 @@ int main(int argc, char** argv)
         } else if (feg_dos){
             print("# Secondaries generated from joint DOS of a Free Electron Gas");
         }
-        if (eg > 0.0)
+        if (val_ele < 0 && (!use_dos || feg_dos))
+        {
+            cerr << "Without -dos or with FEG, -vale must be specified!" << endl;
+            exit(1);
+        }
+        if (ins)
         {
             if (eps0 <= 0.0 || epsinf <=0.0) { cerr << "For insulators eps_0 and eps_inf need to be provided" << endl; exit(1); }
             phdos_arr = read2colFile("phdos.in");
@@ -597,6 +552,14 @@ int main(int argc, char** argv)
             cout << "#" << setw(9) << "EGap" << setw(9) << "Eps_0" << setw(9) << "Eps_inf" << endl;
             cout << "#" << setw(9) << "[eV]" << endl;
             cout << "#" << setw(9) << eg*HA2EV << setw(9) << eps0 << setw(9) << epsinf << "\n#" << endl;
+        }
+        if (polaron)
+        {
+            print("# Trapping by polarons included");
+            cout << "#" << endl;
+            cout << "#" << setw(9) << "C" << setw(9) << "gamma" << endl;
+            cout << "#" << setw(9) << "[1/A]" << setw(9) << "[1/eV]" << endl;
+            cout << "#" << setw(9) << s_trap*ANG2BOHR << setw(9) << gamma_trap*EV2HA << "\n#" << endl;
         }
         if (spher_sec==1)
         {
@@ -614,6 +577,7 @@ int main(int argc, char** argv)
         print("# Input files read");
         print("# Starting mc_sey in \"Simulation\" mode to get SEY\n#");
         vector<Electron > elec_arr;
+        vector<vector<double >> coin_arr;
         ini_angle = asin(sin(ini_angle)*sqrt((erange-u0)/erange));
         int i, progress;
         double s_ene;
@@ -621,6 +585,8 @@ int main(int argc, char** argv)
         array<double,3> s_xyz{0.0,0.0,0.0};
         i = -1;
         progress = 0;
+        bool pe = false;
+        int n_pe = 0;
         auto t1 = std::chrono::high_resolution_clock::now();
 
         for (int n_e = 0; n_e < mc_elec; n_e++)
@@ -633,23 +599,46 @@ int main(int argc, char** argv)
                 printProgress();
             }
             progress = printStars(progress,n_e,mc_elec);
-            elec_arr.push_back(Electron(erange,0.0,0.0,0.0,sin(ini_angle),0.0,cos(ini_angle),0));
+            elec_arr.push_back(Electron(erange,0.0,0.0,0.0,sin(ini_angle),0.0,cos(ini_angle),0,false));
+            pe = false;
             while (i < (int)elec_arr.size()-1)
             {
                 i++;
-                
+                // check if still inside the material and has enough energy
                 while (elec_arr[i].inside && ! elec_arr[i].dead)
                 {
+                    // make the e- travel
                     elec_arr[i].travel_s();
-                    
+                    // check if it escaped
                     elec_arr[i].escaped();
-                    
+                    // check if still inside the material and has enough energy
                     if (elec_arr[i].inside && ! elec_arr[i].dead)
                     {
                         elec_arr[i].determ_scatter();
                         if (elec_arr[i].scatter())
                         {
                             // ionisation
+                            for (size_t i_eb = 0; i_eb < eb_arr.size(); i_eb++)
+                            {
+                                if (elec_arr[i].de-eb_arr[i_eb]>u0)
+                                {
+                                    sum_ebfr = val_ele;
+                                    eb_fr = 0.;
+                                    eb = 0.;
+                                    reb = rand01();
+                                    for (size_t i_ebfr = i_eb; i_ebfr < ebfr_arr.size(); i_ebfr++) { sum_ebfr = sum_ebfr+ebfr_arr[i_ebfr]; }
+                                    for (size_t i_ebfr = i_eb; i_ebfr < ebfr_arr.size(); i_ebfr++)
+                                    {
+                                        eb_fr = eb_fr+ebfr_arr[i_ebfr];
+                                        if (reb < eb_fr/sum_ebfr)
+                                        {
+                                            eb = eb_arr[i_ebfr];
+                                            break;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
                             if (elec_arr[i].de-eb>u0 && eb>0.001)
                             {
                                 s_ene = elec_arr[i].de-eb;
@@ -667,10 +656,11 @@ int main(int argc, char** argv)
                                 } else {
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
-                            }
-                            // valence band interaction (insulators)
-                            else if (ins && elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
+                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
+                            } // no secondary if bound and small energy
+                            else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
+                            // otherwise secondary from fermi sea if more than gap
+                            else if (elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
                             {
                                 s_ene = elec_arr[i].de-eg-elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
@@ -687,38 +677,29 @@ int main(int argc, char** argv)
                                 } else {
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
-                            }
-                            // valence band interaction (metals)
-                            else if (!ins && elec_arr[i].de+elec_arr[i].s_ef>u0)
-                            {
-                                s_ene = elec_arr[i].de+elec_arr[i].s_ef;
-                                s_xyz[0] = elec_arr[i].xyz[0];
-                                s_xyz[1] = elec_arr[i].xyz[1];
-                                s_xyz[2] = elec_arr[i].xyz[2];
-                                if (spher_sec==1) {
-                                    s_uvw = { sin(acos(2.*rand01()-1.))*cos(2.*rand01()*PI),
-                                              sin(acos(2.*rand01()-1.))*sin(2.*rand01()*PI),
-                                              cos(acos(2.*rand01()-1.)) };
-                                } else  if (spher_sec==2) {
-                                    s_uvw = { sin(rand01()*PI)*cos(2.*rand01()*PI),
-                                              sin(rand01()*PI)*sin(2.*rand01()*PI),
-                                              cos(rand01()*PI) };
-                                } else {
-                                    s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
-                                }
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
+                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
                         } 
                         elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
+                }
+                if (! elec_arr[i].dead && ! elec_arr[i].inside)
+                {
+                    if (!elec_arr[i].isse)
+                    {
+                        pe = true;
+                        n_pe = i;
+                    }                  
+                    if (pe && elec_arr[i].secondary == 1 && elec_arr[i].sc_type_counts[1] == 0 && i == (int)elec_arr.size()-1)
+                    {
+                        coin_arr.push_back({elec_arr[n_pe].e*HA2EV, elec_arr[i].e*HA2EV});
+                    }                  
                 }
             }
         }
         vector<vector<array<double,3> > > coord_vec;
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
-        vector<double> se_spec;
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
@@ -729,42 +710,41 @@ int main(int argc, char** argv)
             }
             if (! elec_arr[ei].inside)
             {
-                em++; 
-                if (elec_arr[ei].e < 50.*EV2HA)
+                em++; // emitted
+                if (elec_arr[ei].isse)
                 {
-                    tem++;
-                    if (spec)
-                    {
-                        se_spec.push_back(elec_arr[ei].e*HA2EV);
-                    }
-                    if (distrib)
-                    {
-                        ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
-                    }
-                } else {
-                    bsc++; 
+                    tem++; // true se emitted
                 }
+                else {
+                    bsc++; // backscattered pe
+                }
+                // if (elec_arr[ei].e < 50.*EV2HA)
+                // {
+                if (distrib)
+                {// ene,theta,phi,x,y,secondary
+                    // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
+                    ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1]});
+                }
+                // }
                 if (elec_arr[ei].secondary == 0 && elec_arr[ei].e > (erange-u0)-0.0001)
                 {
-                    e_bsc++; 
+                    e_bsc++; // elastically backscattered 
                 }
                 if (elec_arr[ei].secondary == 0 && elec_arr[ei].e <= (erange-u0)-0.0001)
                 {
-                    d_prim++; 
+                    d_prim++; // diffused primaries 
                 }
             } else {
-                nem++; 
+                nem++; // not emitted
             }
         }
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
         {
+            // saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
             saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
         }
-        if (spec)
-        {
-            saveVector(se_spec,checkName("mc_se_spectrum.plot"));
-        }
+        saveVector(coin_arr,checkName("mc_coin.plot"),2);
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     SEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
@@ -775,10 +755,6 @@ int main(int argc, char** argv)
         cout << setw(8) << (double)bsc/(double)mc_elec;
         cout << setw(8) << (double)d_prim/(double)mc_elec;
         cout << setw(8) << (double)e_bsc/(double)mc_elec << endl;
-        // saveVector(sc_el, checkName("mc_sc_el.plot"));
-        // saveVector(sc_in, checkName("mc_sc_in.plot"));
-        // saveVector(sc_ph, checkName("mc_sc_ph.plot"));
-        // saveVector(sc_pol, checkName("mc_sc_pol.plot"));
         return 0;
     }
     return 0;
@@ -793,20 +769,13 @@ string getTime()
 }
 
 void getInput(int argc, char** argv)
-{
-    double elow;
+{// get arguments from the command line
     if (argc == 1)
     {
         cerr << "No arguments specified, use \"-h\" flag for options.\nAt least the \"prepare\" keyword or \"-e\" flag is needed." << endl;
         exit(1);
     }
     if (strcmp(argv[1], "prepare") == 0) { prep = true; }
-
-    if (ins) {
-        elow = u0;
-    } else {
-        elow = ef+1e-4;
-    }
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-e") == 0 && prep)
@@ -819,25 +788,18 @@ void getInput(int argc, char** argv)
                     ebeg = stod(argv[i+1])*EV2HA;
                     erange = stod(argv[i+2])*EV2HA;
                     egrid = stoi(argv[i+3]);
-                    if (ebeg <= elow)
+                    if (ebeg < 0)
                     {
-                        if (ins) {
-                            cout << "# WARNING: Initial energy too low, setting to 2*E_gap + E_vb = " << (2*eg+evb)*HA2EV << "\n#" << endl;
-                        } else {
-                            cout << "# WARNING: Initial energy too low, setting to E_fermi = " << ef*HA2EV << "\n#" << endl;
-                        }
-                        ebeg = elow;
+                        cout << "# WARNING: Initial energy too low, setting to 1e-4 eV\n#" << endl;
+                        ebeg = 1e-4;
                     }
                 } else if (argv[i+1][0] != '-' && argv[i+2][0] != '-' && argv[i+3][0] == '-')
                 {
-                    ebeg = elow;
+                    ebeg = 1e-4;
                     erange = stod(argv[i+1])*EV2HA;
                     egrid = stoi(argv[i+2]);
-                    if (erange <= elow) {
-                        if (ins)
-                            cerr << "Energy range lower than E_gap + E_vb, stopping." << endl;
-                        else
-                            cerr << "Energy range lower than E_fermi, stopping." << endl;
+                    if (erange <= 1e-4) {
+                        cerr << "Energy range is invalid, stopping." << endl;
                         exit(1);
                     }
                 } else {
@@ -848,7 +810,7 @@ void getInput(int argc, char** argv)
             {
                 if (argv[i+1][0] != '-' && argv[i+2][0] != '-')
                 {
-                    ebeg = elow;
+                    ebeg = 1e-4;
                     erange = stod(argv[i+1])*EV2HA;
                     egrid = stoi(argv[i+2]);
                 } else {
@@ -886,23 +848,33 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-notir") == 0) { notir = true; }
         if (strcmp(argv[i], "-nostep") == 0) { step = false; }
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
-        if (strcmp(argv[i], "SOLID") == 0) { es_muffin = 1; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
-        if (strcmp(argv[i], "-spec") == 0) { spec = true; }
 
-        if (strcmp(argv[i], "-vale") == 0)
+        if (strcmp(argv[i], "SOLID") == 0)
         {
+            atrmuf.clear();
+            es_muffin = 1;
             if (argc > i+1)
             {
                 if (argv[i+1][0] != '-')
                 {
-                    val_ele = stod(argv[i+1]);
+                    int ai=1;
+                    while(argv[i+ai][0] != '-')
+                    {
+                        atrmuf.push_back(stod(argv[i+ai]));
+                        ai++;
+                    }
                 } else {
-                    cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
+                    cerr << "Too few arguments for " << argv[i] << ", needs 1 value for each atom" << endl;
                     exit(1);
                 }
             } else {
-                cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
+                cerr << "Too few arguments for " << argv[i] << ", needs 1 value for each atom" << endl;
+                exit(1);
+            }
+            if (atnum.size() != atrmuf.size() && es_muffin == 1)
+            {
+                cerr << "SOLID selected but the number of RMUF and atoms does not agree." << endl;
                 exit(1);
             }
         }
@@ -1007,19 +979,57 @@ void getInput(int argc, char** argv)
                 cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
                 exit(1);
             }
-            if (mc_elec<1000)
+            if (mc_elec<100)
             {
                 cerr << mc_elec << " MC e-'s is too few, results would make no sense." << endl;
                 exit(1);
             }
         }
         if (strcmp(argv[i], "-core") == 0)
+        {   
+            int iarg = 0;
+            while (argc > i+2+iarg && argv[i+1+iarg][0] != '-' && argv[i+2+iarg][0] != '-')
+            {
+                if (argv[i+1+iarg][0] != '-' && argv[i+2+iarg][0] != '-')
+                {
+                    eb_arr.push_back(stod(argv[i+1+iarg])*EV2HA);
+                    ebfr_arr.push_back(stod(argv[i+2+iarg]));
+                } else {
+                    cerr << "Too few arguments for " << argv[i] << ", needs 2n arguments or a 'core.in' file." << endl;
+                    exit(1);
+                }
+                iarg = iarg + 2;
+            }
+            if (iarg == 0)
+            {
+                ifstream infile("core.in");
+                if(!infile)
+                {
+                    cerr << "Too few arguments for " << argv[i] << ", needs 2n arguments or a 'core.in' file." << endl;
+                    exit(1);
+                } else {
+                    int c_core=1;
+                    double core_tmp;
+                    while ( infile >> core_tmp )
+                    {
+                        if (c_core%2==0)
+                        {
+                            ebfr_arr.push_back(core_tmp);
+                        } else {
+                            eb_arr.push_back(core_tmp*EV2HA);
+                        }
+                        c_core=c_core+1;
+                    }
+                }
+            }
+        }
+        if (strcmp(argv[i], "-vale") == 0)
         {
             if (argc > i+1)
             {
                 if (argv[i+1][0] != '-')
                 {
-                    eb = stod(argv[i+1])*EV2HA;
+                    val_ele = stod(argv[i+1]);
                 } else {
                     cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
                     exit(1);
@@ -1164,30 +1174,6 @@ void getInput(int argc, char** argv)
                 exit(1);
             }
         }
-        if (strcmp(argv[i], "-radial") == 0)
-        {
-            if (argc > i+1)
-            {
-                if (argv[i+1][0] != '-')
-                {
-                    if (strcmp(argv[i+1], "DHFS") == 0)
-                    {
-                        es_el = 1;
-                    } else if (strcmp(argv[i+1], "TFM") == 0)
-                    {
-                        es_el = 2;
-                    } else {
-                        cout << "# WARNING: option " << argv[i+1] << " for radial not known, using DHFS." << endl;
-                    }
-                } else {
-                    cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
-                    exit(1);
-                }
-            } else {
-                cerr << "Too few arguments for " << argv[i] << ", needs 1 argument." << endl;
-                exit(1);
-            }
-        }
     }
 }
 void printVersion(char** argv)
@@ -1196,7 +1182,7 @@ void printVersion(char** argv)
     {
             cout << "MAterials Simulation Toolkit for Secondary Electron Emission (MAST-SEY)" << endl;
             cout << "Cite as: Comput. Mater. Sci. 193 (2021), 110281 (https://doi.org/10.1016/j.commatsci.2021.110281)" << endl;
-            cerr << "(c) 2021 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan\n" << endl;
+            cout << "(c) 2022 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan" << endl;
             cout << "Code version "<< code_version << endl;
             exit(0);
     }
@@ -1204,7 +1190,7 @@ void printVersion(char** argv)
     {
         cout << "MAterials Simulation Toolkit for Secondary Electron Emission (MAST-SEY)" << endl;
         cout << "Cite as: Comput. Mater. Sci. 193 (2021), 110281 (https://doi.org/10.1016/j.commatsci.2021.110281)" << endl;
-        cout << "(c) 2021 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan\n" << endl;
+        cout << "(c) 2022 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan" << endl;
         cout << "\nInput options:\n" << endl;
         cout << "\"prepare\" as first argument will run input preparation from \"eps/elf.in\" and \"material.in\"" << endl;
         cout << "otherwise, the \"simulate\" version will be executed" << endl;
@@ -1222,20 +1208,25 @@ void printVersion(char** argv)
         cout << "         (optional): [SOLID] muffin-tin model potential" << endl;
         cout << "         (optional): [LDA] LDA correlation–polarization potential model" << endl;
         cout << "-ins     calculate properties for insulators" << endl;
-        cout << "-ph      calculate electron-phonon scattering properties" << endl;
         cout << "\n\"simulate\" options:" << endl;
         cout << "-e       [incident_energy(eV)] energy of incident energy" << endl;
         cout << "-m       [number_of_e-] number of incident electrons (def: 1000)" << endl;
-        cout << "-core    [energy(eV)] allow secondaries to come from bound states" << endl;
         cout << "-dos     [FEG (optional)] generate secondaries from joint DOS from prepared \"jdos.in\"" << endl;
         cout << "         or from parabolic free electron gas approximation (FEG)" << endl;
+        cout << "-core    [energy(eV) occupancy]*n allow secondaries to come from bound states" << endl;
+        cout << "         input as pairs of numbers: core state energy below the botton of the valence band" << endl;
+        cout << "                                    and the amount of electrons that occupy that state" << endl;
+        cout << "         (optional) an input file 'core.in' can be used, where each line contains a pair" << endl;
+        cout << "-vale    (optional): number of electrons constituting the valence band" << endl;
+        cout << "                     relevant only for the '-core' option, and mandatory only if 'dos.in' not used" << endl;
+        cout << "-polaron [C(1/A) g(1/eV)] include polaronic effects" << endl;
         cout << "-pa      [angle(deg)] angle of incident electrons with respect to surface normal" << endl;
         cout << "-coord   save travel paths of e-" << endl;
         cout << "-distr   save distribution of secondaries" << endl;
         cout << "-noang   use classical approach to inelastic angle scattering" << endl;
         cout << "-noout   supress all output" << endl;
+        cout << "-nostep  transmission probability from Wentzel-Kramers-Brillouin" << endl;
         cout << "-ins     simulate for insulators" << endl;
-        cout << "-ph      include electron-phonon scattering" << endl;
         cout << "\n-v       display version of the code" << endl;
         cout << "-h       this message\n" << endl;
         cout << "\nPlease be careful when giving input arguments, there is no extensive input checks" << endl;
@@ -1253,11 +1244,10 @@ void readMaterialFile(string filename)
     {
         cerr << "MAterials Simulation Toolkit for Secondary Electron Emission (MAST-SEY)" << endl;
         cerr << "Cite as: Comput. Mater. Sci. 193 (2021), 110281 (https://doi.org/10.1016/j.commatsci.2021.110281)" << endl;
-        cerr << "(c) 2021 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan\n" << endl;
+        cerr << "(c) 2022 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan\n" << endl;
         cerr << "Cannot open obligatory file " << filename << endl;
         cerr << "The file should have, line by line, the following information:" << endl;
         cerr << "Atomic Number, Unit Cell Volume [A^3], Fermi energy [eV], Work Function [eV]\n" << endl;
-
         exit(1);
     }
     int c_mat=1;
@@ -1290,11 +1280,11 @@ void readMaterialFile(string filename)
         exit(1);
     }
     if (ins) {
-        infile >> vol >> eg >> evb >> u0 >> eps0 >> epsinf;;
+        infile >> vol >> ef >> wf >> u0 >> eg >> eps0 >> epsinf;
         eg = EV2HA*eg;
-        evb = EV2HA*evb;
+        ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = u0;
+        ebeg = u0+1e-4;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
@@ -1451,17 +1441,12 @@ void prepareJDOS(const vector<array<double,2> > &dos)
     vector<array<double,2> > arr2d;
     vector<array<double,2> > arr2dint;
     vector<vector<array<double,2> > > arr3d;
-    double d_ev;
     arr2d.reserve(200);
     arr2dint.reserve(200);
-    if (ins) {
-        d_ev = (eg+evb)/200.;
-    } else {
-        d_ev = ef/200.;
-    }
+    double d_ev = ef/200.;
     for (size_t di = 0; di < de_arr.size(); di++)
     {
-        for (int n_ev = 0; n_ev < 200; n_ev++)
+        for (int n_ev = 0; n_ev <= 200; n_ev++)
         {
             arr2d.push_back({n_ev*d_ev,linterp(de_arr[di]+n_ev*d_ev,dos)*linterp(n_ev*d_ev,dos)});
             arr2dint = cumintVect(arr2d);
@@ -1477,7 +1462,7 @@ void printInput()
 {
     cout << "# MAterials Simulation Toolkit for Secondary Electron Emission (MAST-SEY)" << endl;
     cout << "# Cite as: Comput. Mater. Sci. 193 (2021), 110281 (https://doi.org/10.1016/j.commatsci.2021.110281)" << endl;
-    cout << "# (c) 2021 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan\n" << endl;
+    cout << "# (c) 2022 Maciej P. Polak (mppolak@wisc.edu) & Dane Morgan" << endl;
     cout << "# Code version " << code_version << "\n#" << endl;
     cout << "# Job started on " << getTime() << "\n#" << endl;
     cout << "#  Input feedback:\n#" << endl;
@@ -1495,7 +1480,7 @@ void printInput()
             if (ins) {
                 cout << "#" << setw(9) << "Volume" << setw(9) << "Eg" << setw(9) << "Evb" << endl;
                 cout << "#" << setw(9) << "[A^3]" << setw(9) << "[eV]" << setw(9) << "[eV]" << endl;
-                cout << "#" << setw(9) << vol*BOHR2ANG*BOHR2ANG*BOHR2ANG << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << "\n#" << endl;
+                cout << "#" << setw(9) << vol*BOHR2ANG*BOHR2ANG*BOHR2ANG << setw(9) << eg*HA2EV << setw(9) << ef*HA2EV << setw(9) << "\n#" << endl;
             } else {
                 cout << "#" << setw(9) << "Volume" << setw(9) << "EFermi" << endl;
                 cout << "#" << setw(9) << "[A^3]" << setw(9) << "[eV]" << endl;
@@ -1505,7 +1490,7 @@ void printInput()
             if (ins) {
                 cout << "#" << setw(9) << "Elem" << setw(9) << "Volume" << setw(9) << "Eg" << setw(9) << "Evb" << endl;
                 cout << "#" << setw(9) << " " << setw(9) << "[A^3]" << setw(9) << "[eV]" << setw(9) << "[eV]" << endl;
-                cout << "#" << setw(9) << elems[atnum[0]] << setw(9) << vol*BOHR2ANG*BOHR2ANG*BOHR2ANG << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << "\n#" << endl;
+                cout << "#" << setw(9) << elems[atnum[0]] << setw(9) << vol*BOHR2ANG*BOHR2ANG*BOHR2ANG << setw(9) << eg*HA2EV << setw(9) << ef*HA2EV << setw(9) << "\n#" << endl;
             } else {
                 cout << "#" << setw(9) << "Elem" << setw(9) << "Volume" << setw(9) << "EFermi" << endl;
                 cout << "#" << setw(9) << " " << setw(9) << "[A^3]" << setw(9) << "[eV]" << endl;
@@ -1514,28 +1499,14 @@ void printInput()
         }
     } else
     {
-        if (eb>0.01)
-        {
-            if (ins) {
-                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Inner potential" << setw(9) << "BindEne" << setw(9) << "IncAng "<< endl;
-                cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << u0*HA2EV << setw(9) << eb*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
-            } else {
-                cout << "#" << setw(9) << "EFermi" << setw(9) << "WorkFun" << setw(9) << "BindEne" << setw(9) << "IncAng "<< endl;
-                cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << ef*HA2EV << setw(9) << wf*HA2EV << setw(9) << eb*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
-            }
-        } else
-        {
-            if (ins) {
-                cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Inner potential" << setw(9) << "IncAng" << endl;
-                cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << eg*HA2EV << setw(9) << evb*HA2EV << setw(9) << u0*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
-            } else {
-                cout << "#" << setw(9) << "EFermi" << setw(9) << "WorkFun" << setw(9) << "IncAng" << endl;
-                cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
-                cout << "#" << setw(9) << ef*HA2EV << setw(9) << wf*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
-            }
+        if (ins) {
+            cout << "#" << setw(9) << "Eg" << setw(9) << "Evb" << setw(9) << "Inner potential" << setw(9) << "IncAng" << endl;
+            cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
+            cout << "#" << setw(9) << eg*HA2EV << setw(9) << ef*HA2EV << setw(9) << u0*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
+        } else {
+            cout << "#" << setw(9) << "EFermi" << setw(9) << "WorkFun" << setw(9) << "IncAng" << endl;
+            cout << "#" << setw(9) << "[eV]" << setw(9) << "[eV]" << setw(9) << "[deg]" << endl;
+            cout << "#" << setw(9) << ef*HA2EV << setw(9) << wf*HA2EV << setw(9) << ini_angle*180./PI << "\n#" << endl;
         }
     }
 
@@ -1557,13 +1528,24 @@ void printInput()
             cout << "#" << setw(9) << "ElastSc" << setw(9) << "Elect." << endl;
             cout << "#" << setw(9) << "radial" << setw(9) << es_el << endl;
         }
+        cout << "#" << endl;
     }
     else
     {
         cout << "#" << setw(9) << "Inc ene" << setw(9) << "No. e-" << endl;
         cout << "#" << setw(9) << erange*HA2EV << setw(9) << mc_elec << endl;
+        cout << "#" << endl;
+        if (eb_arr.size()>0)
+        {
+            print("# Core electron excitations included:");
+            cout << "#" << setw(9) << "Energy" << setw(9) << "No. e-" << endl;
+            cout << "#" << setw(9) << "[eV]" << endl;
+            for (size_t i = 0; i < eb_arr.size(); i++)
+            {
+                cout << "#" << setw(9) << eb_arr[i]*HA2EV << setw(7) << ebfr_arr[i] << endl;
+            }
+        }
     }
-    cout << "#" << endl;
 }
 
 vector<double> range(double a, double b, int n)
@@ -1911,7 +1893,7 @@ vector<array<double,2> > int_inelastic_ang(double (*f)(double,double,int), doubl
 vector<array<double,2> > inel(double ie)
 {
     vector<array<double,2> > iimfpint;
-    if (ie<=1e-10)
+    if (ie<=2*eg+ef+1e-4)
     {
         for (int i = 0; i <= icsintgrid; i++)
         {
@@ -1922,14 +1904,37 @@ vector<array<double,2> > inel(double ie)
     {
         if (ins)
         {
-            iimfpint = int_inelastic_ene(&qIntFun,eg,ie-eg-evb,icsintgrid,ie,true);
+            iimfpint = int_inelastic_ene(&qIntFun,eg,ie-eg-ef,icsintgrid,ie,true);
         }
         else
         {
-            iimfpint = int_inelastic_ene(&qIntFun,1e-5,ie-ef,icsintgrid,ie,true);
+            iimfpint = int_inelastic_ene(&qIntFun,1e-4,ie-ef,icsintgrid,ie,true);
         }
     }
     return iimfpint;
+}
+
+double qIntFun(double om, double ie, int dummy)
+{
+    double tp = ie;
+    double qm, qp, c;
+    if (ins)
+    {
+        c = pow((1.+(tp - eg)/CC),2)/(1.+(tp - eg)/(2.*CC))*1/(PI*(tp - eg));
+
+        qm = sqrt((tp - eg)*(2.+(tp - eg)/CC))-sqrt((tp-eg-om)*(2.+(tp-eg-om)/CC));
+        qp = sqrt((tp - eg)*(2.+(tp - eg)/CC))+sqrt((tp-eg-om)*(2.+(tp-eg-om)/CC));
+    }
+    else
+    {
+        c = pow((1.+(tp)/CC),2)/(1.+tp/(2.*CC))*1/(PI*tp);
+    
+        qm = sqrt(tp*(2.+tp/CC))-sqrt((tp-om)*(2.+(tp-om)/CC));
+        qp = sqrt(tp*(2.+tp/CC))+sqrt((tp-om)*(2.+(tp-om)/CC));
+    }
+
+    vector<array<double,2> > qint = int_inelastic_ene(&elfq,qm,qp,qintgrid,om);
+    return qint[0][1]*c;
 }
 
 vector<vector<array<double,2> > > inelang(double ie)
@@ -1941,7 +1946,7 @@ vector<vector<array<double,2> > > inelang(double ie)
     for (int d = 0; d <= nde; d++)
     {
         if (ins) {
-            de = eg + (double)d/(double)nde*(ie-eg-evb);
+            de = eg + (double)d/(double)nde*(ie-eg-ef);
         } else {
             de = (double)d/(double)nde*(ie-ef);
         }
@@ -1952,8 +1957,8 @@ vector<vector<array<double,2> > > inelang(double ie)
     return inangint_de;
 }
 
-vector<array<double,2> > elas(double ie, int at, double comp)
-{
+vector<array<double,2> > elas(double ie, int at, double comp, double rmuf)
+{// inelastic properties from radial/elsepa outputs (angle integration of dcs)
     vector<array<double,2> > elasint;
     elasint.reserve(606);
     if (ie<1e-10)
@@ -1967,8 +1972,18 @@ vector<array<double,2> > elas(double ie, int at, double comp)
     {
         if (elsepa)
         {
-            string command = "getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(1);
-            system(command.c_str());
+            if (ie<5.*EV2HA)
+            {
+                ie = 5.*EV2HA;
+            }
+            if(rmuf < 0)
+            {
+                string command = "getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(1);
+                system(command.c_str());
+            } else {
+                string command = "getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(1)+" "+to_string(rmuf);
+                system(command.c_str());
+            }
         }
         else
         {
@@ -1994,12 +2009,12 @@ vector<array<double,2> > elas(double ie, int at, double comp)
 }
 
 double linterp(double x, const vector<array<double,2> > &xyarr, bool xfind)
-{
+{//linear interpolation of a function to get value at arbitrary x or y if xfind=true
     for (size_t i = 0; i < xyarr.size()-1; i++)
     {
         if (xfind)
         {
-            if(x<xyarr[i+1][1] && x>=xyarr[i][1])
+            if(x<=xyarr[i+1][1] && x>=xyarr[i][1])
             {
                 return xyarr[i][0]+(xyarr[i+1][0]-xyarr[i][0])*(x-xyarr[i][1])/(xyarr[i+1][1]-xyarr[i][1]);
                 break;
@@ -2018,13 +2033,13 @@ double linterp(double x, const vector<array<double,2> > &xyarr, bool xfind)
 }
 
 double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr, bool total, bool xfind)
-{
+{// linear interpolation of a vector of double vectors
     vector<array<double,2> > ytup_intrp;
-    if (!total)
+    if (!total || y0>0)
     {
         ytup_intrp.reserve(ytuparr[0].size());
     }
-    double dx;
+    double dx, dx0;
     for (size_t i = 0; i < xarr.size()-1; i++)
     {
         if (x0<=xarr[i+1] && x0>=xarr[i])
@@ -2032,8 +2047,24 @@ double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<v
             dx = (x0-xarr[i])/(xarr[i+1]-xarr[i]);
             if (total)
             {
-                return ytuparr[i][ytuparr[i].size()-1][1]+(ytuparr[i+1][ytuparr[i+1].size()-1][1]-ytuparr[i][ytuparr[i].size()-1][1])*dx;
-                break;
+                if(y0>0)
+                {
+                    for (size_t j = 0; j < ytuparr[0].size(); j++)
+                    {
+                        ytup_intrp.push_back({ytuparr[i][j][0]+(ytuparr[i+1][j][0]-ytuparr[i][j][0])*dx,ytuparr[i][j][1]+(ytuparr[i+1][j][1]-ytuparr[i][j][1])*dx});
+                    }
+                    //cout << y0 << " " << ytup_intrp[0][0] << "," << ytup_intrp[0][1] << " " << ytup_intrp[ytup_intrp.size()-1][0] << "," << ytup_intrp[ytup_intrp.size()-1][1] << endl;
+                    for (size_t j = 0; j < ytup_intrp.size(); j++)
+                    {
+                        if (y0<=ytup_intrp[j+1][0] && y0>=ytup_intrp[j][0])
+                        {
+                            dx0 = (y0-ytup_intrp[j][0])/(ytup_intrp[j+1][0]-ytup_intrp[j][0]);
+                            return ytup_intrp[j][1]+(ytup_intrp[j+1][1]-ytup_intrp[j][1])*dx;
+                        }
+                    }
+                } else {
+                    return ytuparr[i][ytuparr[i].size()-1][1]+(ytuparr[i+1][ytuparr[i+1].size()-1][1]-ytuparr[i][ytuparr[i].size()-1][1])*dx;
+                }
             }
             else
             {
@@ -2046,26 +2077,6 @@ double linterp2d(double x0,double y0, const vector<double> &xarr, const vector<v
         }
     }
     return linterp(y0, ytup_intrp, xfind);
-}
-
-vector<array<double,2>> linterp1d(double x0,double y0, const vector<double> &xarr, const vector<vector<array<double,2> > > &ytuparr)
-{
-    vector<array<double,2>> ytup_intrp;
-    ytup_intrp.reserve(ytuparr[0].size());
-    double dx;
-    for (size_t i = 0; i < xarr.size()-1; i++)
-    {
-        if (x0<=xarr[i+1] && x0>=xarr[i])
-        {
-            dx = (x0-xarr[i])/(xarr[i+1]-xarr[i]);
-            for (size_t j = 0; j < ytuparr[0].size(); j++)
-            {
-                ytup_intrp.push_back({ytuparr[i][j][0]+(ytuparr[i+1][j][0]-ytuparr[i][j][0])*dx,ytuparr[i][j][1]+(ytuparr[i+1][j][1]-ytuparr[i][j][1])*dx});
-            }
-            break;
-        }
-    }
-    return ytup_intrp;
 }
 
 double fzero(double (*f)(double,double,double), double x0, double x1, double ww, double qq, double tol)
@@ -2110,7 +2121,7 @@ double fpa_elf(double w, double q)
     return integ;
 }
 
-double  dft_elf(double w, double q)
+double dft_elf(double w, double q)
 {
     return linterp2d(q,w,q_arr,ene_elf,false,false);
 }
@@ -2145,40 +2156,6 @@ double elfq(double q, double om, int dq)
     }
 }
 
-double phonIntFun(double e, double e_, double theta)
-{
-    double b;
-    double sigma;
-
-    b = log( (e+e_+2*sqrt(e*e_))/(e+e_-2*sqrt(e*e_)) ) * 1/2*sqrt(e*e_);
-    sigma = 1/b * sin(theta)/(e+e_-2*sqrt(e*e_)*cos(theta));
-
-    return sigma;
-}
-
-double qIntFun(double om, double ie, int dummy)
-{
-    double tp = ie;
-    double qm, qp, c;
-    if (ins)
-    {
-        c = pow((1.+(tp - eg)/(137.*137.)),2)/(1.+(tp - eg)/(2.*137.*137.))*1/(PI*(tp - eg));
-
-        qm = sqrt((tp - eg)*(2.+(tp - eg)/(cc*cc)))-sqrt((tp-eg-om)*(2.+(tp-eg-om)/(cc*cc)));
-        qp = sqrt((tp - eg)*(2.+(tp - eg)/(cc*cc)))+sqrt((tp-eg-om)*(2.+(tp-eg-om)/(cc*cc)));
-    }
-    else
-    {
-        c = pow((1.+(tp)/(137.*137.)),2)/(1.+tp/(2.*137.*137.))*1/(PI*tp);
-    
-        qm = sqrt(tp*(2.+tp/(cc*cc)))-sqrt((tp-om)*(2.+(tp-om)/(cc*cc)));
-        qp = sqrt(tp*(2.+tp/(cc*cc)))+sqrt((tp-om)*(2.+(tp-om)/(cc*cc)));
-    }
-
-    vector<array<double,2> > qint = int_inelastic_ene(&elfq,qm,qp,qintgrid,om);
-    return qint[0][1]*c;
-}
-
 double jdos(double e, double de, double r)
 {
     return (de*sqrt(e*(de+e))+2.*e*sqrt(e*(de+e))-pow(de,2.)*asinh(sqrt(e/de)))/(de*sqrt(ef*(de+ef))+2.*ef*sqrt(ef*(de+ef))-pow(de,2.)*asinh(sqrt(ef/de)))-r;
@@ -2210,7 +2187,7 @@ void printVector(vector<vector<array<double,2> > > &arr)
     }
 }
 
-void marker(string num)
+void marker(int num)
 { cout << "HERE_" << num << endl; }
 void print(string text)
 { cout << text << endl; }
