@@ -238,6 +238,11 @@ class Electron
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
             de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
+            if (ins && de < eg)
+            {
+                // cout << "de = " << de << ", eg = " << eg << endl;
+                de = eg;
+            }
             if (classical_ang)
             {
                 defl[0] = asin(sqrt(de/e));
@@ -249,17 +254,21 @@ class Electron
                 defl[0] = linterp(rn3*int_inelas_ang[int_inelas_ang.size()-1][1],int_inelas_ang,true);
             }
             e = e-de;
-            if (eg>0.001) {
+            if (ins) {
                 double rn4 = random01();
                 de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             }
             died();
             if (! dead)
             {
+                if (ins) {
+                    double rn4 = random01();
+                    de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                    iphmfp = IPHMFP();
+                    ipolmfp = IPOLMFP();
+                }
                 iimfp = IIMFP();
                 iemfp = IEMFP();
-                iphmfp = IPHMFP();
-                ipolmfp = IPOLMFP();
                 itmfp = iemfp+iimfp+iphmfp+ipolmfp;
             }
             if (use_dos) 
@@ -278,10 +287,7 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                if (ins)
-                    s_ef = 0;
-                else
-                    s_ef = ef;
+                s_ef = ef;
             }
             return true;
         }
@@ -448,10 +454,10 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0],atrmuf[0]));
+            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia],atrmuf[ia]);
+                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -461,7 +467,15 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                inel_arr.push_back(inel(ie_arr[i]+eg+ef)); //+eg+ef
+                if (ins)
+                {
+                    if (ie_arr[i] < 2*eg+ef)
+                        inel_arr.push_back(inel(1e-15));
+                    else
+                        inel_arr.push_back(inel(ie_arr[i]));
+                }
+                else
+                    inel_arr.push_back(inel(ie_arr[i]));
             }
         }
         if (preprange)
@@ -660,9 +674,10 @@ int main(int argc, char** argv)
                             } // no secondary if bound and small energy
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
-                            else if (elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
+                            // valence band interaction (insulators)
+                            else if (ins && elec_arr[i].de+elec_arr[i].s_ef>u0 && elec_arr[i].de+elec_arr[i].s_ef>eg+ef)
                             {
-                                s_ene = elec_arr[i].de-eg-elec_arr[i].s_ef;
+                                s_ene = elec_arr[i].de+elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
                                 s_xyz[2] = elec_arr[i].xyz[2];
@@ -770,12 +785,19 @@ string getTime()
 
 void getInput(int argc, char** argv)
 {// get arguments from the command line
+    double elow;
     if (argc == 1)
     {
         cerr << "No arguments specified, use \"-h\" flag for options.\nAt least the \"prepare\" keyword or \"-e\" flag is needed." << endl;
         exit(1);
     }
     if (strcmp(argv[1], "prepare") == 0) { prep = true; }
+
+    if (ins) {
+        elow = 5+1e-4;
+    } else {
+        elow = ef+1e-4;
+    }
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-e") == 0 && prep)
@@ -788,17 +810,17 @@ void getInput(int argc, char** argv)
                     ebeg = stod(argv[i+1])*EV2HA;
                     erange = stod(argv[i+2])*EV2HA;
                     egrid = stoi(argv[i+3]);
-                    if (ebeg < 0)
+                    if (ebeg < elow)
                     {
                         cout << "# WARNING: Initial energy too low, setting to 1e-4 eV\n#" << endl;
-                        ebeg = 1e-4;
+                        ebeg = elow;
                     }
                 } else if (argv[i+1][0] != '-' && argv[i+2][0] != '-' && argv[i+3][0] == '-')
                 {
-                    ebeg = 1e-4;
+                    ebeg = elow;
                     erange = stod(argv[i+1])*EV2HA;
                     egrid = stoi(argv[i+2]);
-                    if (erange <= 1e-4) {
+                    if (erange <= elow) {
                         cerr << "Energy range is invalid, stopping." << endl;
                         exit(1);
                     }
@@ -810,7 +832,7 @@ void getInput(int argc, char** argv)
             {
                 if (argv[i+1][0] != '-' && argv[i+2][0] != '-')
                 {
-                    ebeg = 1e-4;
+                    ebeg = elow;
                     erange = stod(argv[i+1])*EV2HA;
                     egrid = stoi(argv[i+2]);
                 } else {
@@ -1280,11 +1302,11 @@ void readMaterialFile(string filename)
         exit(1);
     }
     if (ins) {
-        infile >> vol >> ef >> wf >> u0 >> eg >> eps0 >> epsinf;
+        infile >> vol >> ef >> u0 >> eg >> eps0 >> epsinf;
         eg = EV2HA*eg;
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = u0+1e-4;
+        ebeg = 5+1e-4;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
@@ -1443,7 +1465,12 @@ void prepareJDOS(const vector<array<double,2> > &dos)
     vector<vector<array<double,2> > > arr3d;
     arr2d.reserve(200);
     arr2dint.reserve(200);
-    double d_ev = ef/200.;
+    double d_ev;
+    if (ins) {
+        d_ev = (2*eg+ef)/200.;
+    } else {
+        d_ev = ef/200.;
+    }
     for (size_t di = 0; di < de_arr.size(); di++)
     {
         for (int n_ev = 0; n_ev <= 200; n_ev++)
