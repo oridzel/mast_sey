@@ -794,7 +794,7 @@ void getInput(int argc, char** argv)
     if (strcmp(argv[1], "prepare") == 0) { prep = true; }
 
     if (ins) {
-        elow = 5+1e-4;
+        elow = EV2HA*5+1e-4;
     } else {
         elow = ef+1e-4;
     }
@@ -1306,7 +1306,7 @@ void readMaterialFile(string filename)
         eg = EV2HA*eg;
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = 5+1e-4;
+        ebeg = EV2HA*5+1e-4;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
