@@ -236,8 +236,8 @@ class Electron
         }
         else if (sc_type == 1)
         {
-            double detot_inel_int = linterp2d(e+ef,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e+ef,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
+            double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
+            de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
             if (ins && de < eg)
             {
                 // cout << "de = " << de << ", eg = " << eg << endl;
@@ -287,7 +287,10 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                s_ef = ef;
+                if (ins)
+                    s_ef = 0.0;
+                else
+                    s_ef = ef;
             }
             return true;
         }
@@ -469,10 +472,10 @@ int main(int argc, char** argv)
             {
                 if (ins)
                 {
-                    if (ie_arr[i] < 2*eg+ef)
+                    if (ie_arr[i] <= eg)
                         inel_arr.push_back(inel(1e-15));
                     else
-                        inel_arr.push_back(inel(ie_arr[i]));
+                        inel_arr.push_back(inel(ie_arr[i]+eg+ef));
                 }
                 else
                     inel_arr.push_back(inel(ie_arr[i]));
@@ -675,9 +678,9 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            else if (ins && elec_arr[i].de+elec_arr[i].s_ef>u0 && elec_arr[i].de+elec_arr[i].s_ef>eg+ef)
+                            else if (ins && elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
                             {
-                                s_ene = elec_arr[i].de+elec_arr[i].s_ef;
+                                s_ene = elec_arr[i].de-eg-elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
                                 s_xyz[2] = elec_arr[i].xyz[2];
