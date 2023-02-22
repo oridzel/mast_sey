@@ -289,9 +289,11 @@ class Electron
                 }
             } else {
                 if (ins)
+                {
                     s_ef = 0.0;
-                else
+                } else {
                     s_ef = ef;
+                }
             }
             return true;
         }
@@ -473,8 +475,7 @@ int main(int argc, char** argv)
             {
                 if (ins)
                 {
-                    // inel_arr.push_back(inel(ie_arr[i]+ef+eg));
-                    inel_arr.push_back(inel(ie_arr[i]+ef));
+                    inel_arr.push_back(inel(ie_arr[i]+ef+eg));
                 }
                 else
                     inel_arr.push_back(inel(ie_arr[i]));
@@ -685,10 +686,8 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            // else if (ins && elec_arr[i].de-eg-elec_arr[i].s_ef>u0)
                             else if (ins && elec_arr[i].de-elec_arr[i].s_ef>u0)
                             {
-                                // s_ene = elec_arr[i].de-eg-elec_arr[i].s_ef;
                                 s_ene = elec_arr[i].de-elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
