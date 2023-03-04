@@ -231,8 +231,8 @@ class Electron
         defl[1] = rn*2.*PI;
         if (sc_type == 0)
         {
-            double tot_elast_int = linterp2d(e,-1,ie_arr,elas_arr,true);
-            defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
+            double tot_elast_int = linterp2d(e+ef+eg,-1,ie_arr,elas_arr,true);
+            defl[0] = linterp2d(e+ef+eg,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
         else if (sc_type == 1)
@@ -289,11 +289,9 @@ class Electron
                 }
             } else {
                 if (ins)
-                {
                     s_ef = 0.0;
-                } else {
+                else
                     s_ef = ef;
-                }
             }
             return true;
         }
@@ -364,7 +362,7 @@ class Electron
         if (xyz[2]<0.0)
         {
             double beta = PI-angles[0];
-            double ecos = e*cos(beta)*cos(beta);
+            double ecos = (e)*cos(beta)*cos(beta);
             if (ecos > u0)
             {
                 if (step)
@@ -382,7 +380,7 @@ class Electron
                 xyz[0] = xyz[0]+sin(beta)*cos(angles[1])*xyz[2]/cos(beta);
                 xyz[1] = xyz[1]+sin(beta)*sin(angles[1])*xyz[2]/cos(beta);
                 xyz[2] = 0.0;
-                angles[0] = PI-asin(sin(beta)*sqrt(e/(e-u0)));
+                angles[0] = PI-asin(sin(beta)*sqrt((e)/(e-u0)));
                 e = e-u0;
                 if (save_coords)
                 {
@@ -737,7 +735,7 @@ int main(int argc, char** argv)
                     {
                         pe = true;
                         n_pe = i;
-                    } else if (!se || pair)
+                    } else if (!se && pair)
                     {
                         se = true;
                         n_se = i;
@@ -1360,7 +1358,7 @@ void readMaterialFile(string filename)
         eg = EV2HA*eg;
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = EV2HA*1+1e-4;
+        ebeg = EV2HA*u0+1e-4;
     } else {
         infile >> vol >> ef >> u0 >> wf;
         ef = EV2HA*ef;
