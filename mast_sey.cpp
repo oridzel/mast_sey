@@ -239,11 +239,13 @@ class Electron
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
             de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
-            // if (ins && de < eg)
-            // {
-            //     // cout << "de = " << de << ", eg = " << eg << endl;
-            //     de = eg;
-            // }
+            if (ins && de < eg)
+            {
+                // cout << "de = " << de << ", eg = " << eg << endl;
+                de = eg;
+            }
+            if (ins && de > e)
+                cout << "de = " << de << ", e = " << e << endl;
             if (classical_ang)
             {
                 defl[0] = asin(sqrt(de/e));
@@ -288,10 +290,7 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                if (ins)
-                    s_ef = 0.0;
-                else
-                    s_ef = ef;
+                s_ef = ef;
             }
             return true;
         }
@@ -601,10 +600,7 @@ int main(int argc, char** argv)
         array<double,3> s_xyz{0.0,0.0,0.0};
         i = -1;
         progress = 0;
-        bool pe = false;
-        bool se = false;
         int halfpair = 0;
-        bool pair = false;
         int n_pe = 0;
         int n_se = 0;
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -620,9 +616,7 @@ int main(int argc, char** argv)
             }
             progress = printStars(progress,n_e,mc_elec);
             elec_arr.push_back(Electron(erange,0.0,0.0,0.0,sin(ini_angle),0.0,cos(ini_angle),0,false));
-            pe = false;
             halfpair = 0;
-            n_pe = i;
             if (n_e > 0) detected_elec_arr.clear();
             while (i < (int)elec_arr.size()-1)
             {
@@ -729,28 +723,20 @@ int main(int argc, char** argv)
                 }
                 if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
                 {
-                    halfpair += 1;
-
-                    if (!elec_arr[i].isse)
+                    if (halfpair == 0)
                     {
-                        pe = true;
                         n_pe = i;
-                    } else if (!se && pair)
-                    {
-                        se = true;
-                        n_se = i;
-                        pair = false;
+                        halfpair = 1;
                     }
-
-                    if (pe && elec_arr[i].secondary == 1 && elec_arr[i].sc_type_counts[1] == 0 && i == (int)elec_arr.size()-1)
+                    else
                     {
-                        coin_arr.push_back({elec_arr[n_pe].e*HA2EV, elec_arr[i].e*HA2EV});
-                        pair = true;
-                    }
-                    else if (se && elec_arr[i].secondary == elec_arr[n_se].secondary+1 && elec_arr[i].num_se == 0 && i - n_se == elec_arr[n_se].num_se)
-                    {
-                        coin_arr.push_back({elec_arr[n_se].e*HA2EV, elec_arr[i].e*HA2EV});
-                        pair = true;
+                        if (halfpair == 1)
+                        {
+                            n_se = i;
+                            halfpair = 2;
+                        }
+                        else
+                            halfpair += 1;
                     }
                 }
 
@@ -758,6 +744,11 @@ int main(int argc, char** argv)
                 {
                     detected_elec_arr.push_back(elec_arr[i]);
                 }
+            }
+
+            if (halfpair == 2 && coin)
+            {
+                coin_arr.push_back({elec_arr[n_pe].e*HA2EV, elec_arr[n_se].e*HA2EV});
             }
         }
         vector<vector<array<double,3> > > coord_vec;
@@ -1978,9 +1969,10 @@ vector<array<double,2> > inel(double ie)
     {
         if (ie < 2*eg+ef+1e-4)
         {
+            double dx = ie/icsintgrid;
             for (int i = 0; i <= icsintgrid; i++)
             {
-                iimfpint.push_back({0.0,0.0});
+                iimfpint.push_back({dx*i,0.0});
             }
         }
         else
