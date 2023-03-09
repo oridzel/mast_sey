@@ -290,7 +290,10 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                s_ef = ef;
+                if (ins)
+                    s_ef = 0.0;
+                else
+                    s_ef = ef;
             }
             return true;
         }
@@ -593,6 +596,7 @@ int main(int argc, char** argv)
         vector<Electron > elec_arr;
         vector<Electron > detected_elec_arr;
         vector<vector<double >> coin_arr;
+        vector<double> singles_arr;
         ini_angle = asin(sin(ini_angle)*sqrt((erange-u0)/erange));
         int i, progress;
         double s_ene;
@@ -745,7 +749,10 @@ int main(int argc, char** argv)
                     detected_elec_arr.push_back(elec_arr[i]);
                 }
             }
-
+            if (halfpair == 1 && coin)
+            {
+                singles_arr.push_back(elec_arr[n_pe].e*HA2EV);
+            }
             if (halfpair == 2 && coin)
             {
                 coin_arr.push_back({elec_arr[n_pe].e*HA2EV, elec_arr[n_se].e*HA2EV});
@@ -801,6 +808,7 @@ int main(int argc, char** argv)
         if (coin)
         {
             saveVector(coin_arr,checkName("mc_coin.plot"),2);
+            saveVector(singles_arr,checkName("mc_singles.plot"));
         }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
