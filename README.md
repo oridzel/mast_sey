@@ -136,9 +136,15 @@ otherwise, the "simulate" version will be executed
 "simulate" options:
 -e       [incident_energy(eV)] energy of incident energy
 -m       [number_of_e-] number of incident electrons (def: 1000)
--core    [energy(eV)] allow secondaries to come from bound states
 -dos     [FEG (optional)] generate secondaries from joint DOS from prepared "jdos.in"
          or from parabolic free electron gas approximation (FEG)
+-core    [energy(eV) occupancy]*n allow secondaries to come from bound states
+         input as pairs of numbers: core state energy below the botton of the valence band
+                                    and the amount of electrons that occupy that state
+         (optional) an input file 'core.in' can be used, where each line contains a pair
+-vale    (optional): number of electrons constituting the valence band
+                     relevant only for the '-core' option, and mandatory only if 'dos.in' not used
+-polaron [C(1/A) g(1/eV)] include polaronic effects
 -pa      [angle(deg)] angle of incident electrons with respect to surface normal
 -coord   save travel paths of e-
 -distr   save distribution of secondaries
