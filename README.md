@@ -132,7 +132,6 @@ otherwise, the "simulate" version will be executed
          (optional): [SOLID] muffin-tin model potential
          (optional): [LDA] LDA correlation–polarization potential model
 -ins     calculate properties for insulators
--ph      calculate electron-phonon scattering properties
 
 "simulate" options:
 -e       [incident_energy(eV)] energy of incident energy
@@ -161,7 +160,7 @@ mast_sey prepare -e 1000 100 -i 100 50 -elastic F DHFS FM -qdep SPA -ins
 mast_sey -e 350 -m 10000 -ins
 
 mast_sey prepare -e 1000 100 -i 100 50 -elastic F DHFS FM -qdep SPA -ins -ph
-mast_sey -e 350 -m 10000 -ins -ph
+mast_sey -e 350 -m 10000 -ins -coin -vale 16 -dos
 ```
 
 The [examples directory](https://github.com/uw-cmg/MAST-SEY/tree/master/examples) contains examples that showcase most of the capabilities of the code.
