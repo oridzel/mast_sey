@@ -61,20 +61,21 @@ The code is executed in two steps:
 ### The "prepare" step
 This step postprocesses the input files to a form convenient for the second step to use. It takes the dielectric function `eps.in` or the energy loss function `elf.in`, and using the parameters contained in `material.in`, prepares the cumulative integrals of cross sections. These results are stored in `inelastic.in` and `elastic.in`. Additionally a file `mfp.plot` is generated, and allows for a convenient plotting of the inelastic and elastic mean free paths, which are generated in this step as well. This step is performed only once for each case.
 
-Example `material.in` file for metals containing (the atomic number, volume (A^3), the Fermi energy (eV), the work function (eV)):
+Example `material.in` file for elementals containing (the atomic number, volume (A^3), the Fermi energy (eV), the work function (eV)):
 ```
 79
 16.929
 9.0
 5.1
 ```
-Example `material.in` file for insulators containing (the atomic number, volume (A^3), the band gap energy (eV), the width of the valence band (eV), the electron affinity (eV)):
+Example `material.in` file for insulators containing (the list of the atomic numbers and fractions in the case of alloys, volume (A^3), the width of the valence band (eV), the electron affinity (eV), the band gap energy (eV), and eps_0 and eps_inf for phonons) given for SiO2:
 ```
-79
-16.929
-6.7
-15.8
-1.3
+14 0.3333 8 0.6666
+15.185
+10
+1.1
+9.1
+3.84 2.25
 ```
 
 The `elf.in` file with the custom q-dependency has the following structure:
@@ -99,18 +100,10 @@ energy[n] ELF[n][q[k]]
 q[k] q[k]
 ```
 
-Example `ph.in` file for insulators containing ([energy loss (eV)], eps_0, eps_inf) to include the electron-phonon interaction:
-```
-0.062 0.15
-3.84
-2.25
-```
-
 The command below is an example of how to run the "prepare" step:
 ```bash
 mast_sey prepare -e 1000 100 -i 100 50 -qdep SPA -elastic P DHFS FM
 mast_sey prepare -e 1000 100 -i 100 50 -qdep SPA -elastic P DHFS FM -ins
-mast_sey prepare -e 1000 100 -i 100 50 -qdep SPA -elastic P DHFS FM -ins -ph
 ```
 The user should be greeted with the default MAST-SEY output screen. It contains the basic info along with a short feedback on the chosen options and files used. If a basic error is detected, it will be displayed here. In all the input values are correct, a progress bar on the bottom should start filling up (although for accurate calculations it may take a while for even the first bar to appear).
 
@@ -150,10 +143,10 @@ otherwise, the "simulate" version will be executed
 -pa      [angle(deg)] angle of incident electrons with respect to surface normal
 -coord   save travel paths of e-
 -distr   save distribution of secondaries
+-coin    simulate coicidences
 -noang   use classical approach to inelastic angle scattering
 -noout   supress all output
 -ins     simulate for insulators
--ph      include electron-phonon scattering
 
 -v       display version of the code
 -h       this message
