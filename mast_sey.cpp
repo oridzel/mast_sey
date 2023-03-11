@@ -133,6 +133,8 @@ int printStars(int progr, int is, int size);
 double rand01();
 string checkName (string name);
 
+vector <double> valband;
+
 class Electron
 {
     public:
@@ -279,7 +281,7 @@ class Electron
                 double rn5 = random01();
                 if (feg_dos)
                 {
-                    s_ef = fzero(&jdos,0.,ef,de,rn5);
+                    s_ef = ef - fzero(&jdos,0.,ef,de,rn5);
                 } else {
                     double s_ef_int0 = 0.0;
                     if (ef-de > 0)
@@ -290,11 +292,12 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                if (ins)
-                    s_ef = 0.0;
-                else
-                    s_ef = ef;
+                // if (ins)
+                //     s_ef = 0.0;
+                // else
+                s_ef = ef;
             }
+            valband.push_back(s_ef);
             return true;
         }
         else if (sc_type == 2)
@@ -799,6 +802,7 @@ int main(int argc, char** argv)
                 nem++; // not emitted
             }
         }
+        saveVector(valband,checkName("mc_sef.plot"));
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
         {
@@ -1519,11 +1523,7 @@ void prepareJDOS(const vector<array<double,2> > &dos)
     arr2d.reserve(200);
     arr2dint.reserve(200);
     double d_ev;
-    if (ins) {
-        d_ev = (2*eg+ef)/200.;
-    } else {
-        d_ev = ef/200.;
-    }
+    d_ev = ef/200.;
     for (size_t di = 0; di < de_arr.size(); di++)
     {
         for (int n_ev = 0; n_ev <= 200; n_ev++)
