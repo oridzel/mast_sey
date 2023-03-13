@@ -169,11 +169,12 @@ class Electron
         iemfp = IEMFP();
         iimfp = IIMFP();
         iphmfp = 0.0;
-        ipolmfp = IPOLMFP();
+        ipolmfp = 0.0;
         if (ins)
         {
             de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             iphmfp = IPHMFP();
+            ipolmfp = IPOLMFP();
         }
         itmfp = iemfp+iimfp+iphmfp+ipolmfp;
         inside = true;
@@ -281,7 +282,7 @@ class Electron
                 double rn5 = random01();
                 if (feg_dos)
                 {
-                    s_ef = ef - fzero(&jdos,0.,ef,de,rn5);
+                    s_ef = fzero(&jdos,0.,ef,de,rn5);
                 } else {
                     double s_ef_int0 = 0.0;
                     if (ef-de > 0)
@@ -292,11 +293,10 @@ class Electron
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
                 }
             } else {
-                // if (ins)
-                //     s_ef = 0.0;
-                // else
                 s_ef = ef;
             }
+            if (ins)
+                s_ef = ef - s_ef;
             valband.push_back(s_ef);
             return true;
         }
@@ -308,6 +308,7 @@ class Electron
             e = e-de;
             double rn3 = random01();
             de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            
             died();
             if (! dead)
             {
@@ -367,7 +368,7 @@ class Electron
         if (xyz[2]<0.0)
         {
             double beta = PI-angles[0];
-            double ecos = (e)*cos(beta)*cos(beta);
+            double ecos = e*cos(beta)*cos(beta);
             if (ecos > u0)
             {
                 if (step)
@@ -385,7 +386,7 @@ class Electron
                 xyz[0] = xyz[0]+sin(beta)*cos(angles[1])*xyz[2]/cos(beta);
                 xyz[1] = xyz[1]+sin(beta)*sin(angles[1])*xyz[2]/cos(beta);
                 xyz[2] = 0.0;
-                angles[0] = PI-asin(sin(beta)*sqrt((e)/(e-u0)));
+                angles[0] = PI-asin(sin(beta)*sqrt(e/(e-u0)));
                 e = e-u0;
                 if (save_coords)
                 {
@@ -477,9 +478,7 @@ int main(int argc, char** argv)
             if(!emfp_only)
             {
                 if (ins)
-                {
                     inel_arr.push_back(inel(ie_arr[i]+ef+eg));
-                }
                 else
                     inel_arr.push_back(inel(ie_arr[i]));
             }
@@ -685,9 +684,9 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            else if (ins && elec_arr[i].de-elec_arr[i].s_ef>u0)
+                            else if (ins && elec_arr[i].de-elec_arr[i].s_ef-eg>u0)
                             {
-                                s_ene = elec_arr[i].de-elec_arr[i].s_ef;
+                                s_ene = elec_arr[i].de-elec_arr[i].s_ef-eg;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
                                 s_xyz[2] = elec_arr[i].xyz[2];
@@ -1358,10 +1357,10 @@ void readMaterialFile(string filename)
     }
     if (ins) {
         infile >> vol >> ef >> u0 >> eg >> eps0 >> epsinf;
-        eg = EV2HA*eg;
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
-        ebeg = EV2HA*u0+1e-4;
+        eg = EV2HA*eg;
+        ebeg = u0+1e-4;
     } else {
         infile >> vol >> ef >> u0 >> wf;
         ef = EV2HA*ef;
