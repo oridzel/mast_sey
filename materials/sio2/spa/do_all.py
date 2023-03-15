@@ -1,7 +1,7 @@
 import os
 from multiprocessing import Pool
 
-energies = [20, 30, 40, 50, 100, 200, 300, 500, 700, 980]
+energies = [20, 30, 40, 50, 100, 200, 300, 500, 700, 900, 1200, 1500, 1800]
 
 def run_mast(i):
 	print(energies[i])
