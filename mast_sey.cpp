@@ -473,7 +473,10 @@ int main(int argc, char** argv)
                 elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
+                if (ins)
+                    elas_alloy_arr = elas(ie_arr[i]+ef+eg,atnum[ia],atcomp[ia]);
+                else
+                    elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
