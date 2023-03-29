@@ -309,8 +309,8 @@ class Electron
             double bph = (e+e-de+2.0*sqrt(e*(e-de)))/(e+e-de-2.0*sqrt(e*(e-de)));
             defl[0] = acos((e+e-de)/(2.0*sqrt(e*(e-de)))*(1.0-pow(bph,rn2))+pow(bph,rn2));
             e = e-de;
-            // double rn3 = random01();
-            // de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            double rn3 = random01();
+            de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             
             died();
             if (! dead)
@@ -559,7 +559,7 @@ int main(int argc, char** argv)
         } else if (feg_dos){
             print("# Secondaries generated from joint DOS of a Free Electron Gas");
         }
-        if (val_ele < 0 && (!use_dos || feg_dos))
+        if (val_ele < 0 && eb_arr.size() > 0 && (!use_dos || feg_dos))
         {
             cerr << "Without -dos or with FEG, -vale must be specified!" << endl;
             exit(1);
