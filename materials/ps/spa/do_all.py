@@ -5,7 +5,7 @@ energies = [5,6,7,8,9,10,12,14,16,18,20, 25, 30, 35, 40, 45, 50, 100, 250, 500, 
 
 def run_mast(i):
 	print(energies[i])
-	os.system("mast_sey -e {} -m 1000 -ins -vale 40  > out/e{}.stdout.txt".format(energies[i],energies[i]))
+	os.system("mast_sey -e {} -m 1000 -ins -vale 40 -dos FEG  > out/e{}.stdout.txt".format(energies[i],energies[i]))
 
 
 if __name__ == '__main__':

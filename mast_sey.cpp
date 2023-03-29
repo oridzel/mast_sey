@@ -55,7 +55,7 @@ bool elsepa = false;
 int es_nuc = 3, es_el = 1, es_ex = 1, es_muffin = 0, es_mcpol = 0;
 bool emfp_only = false;
 bool fermi_only = false;
-bool step =  true;
+bool step = true;
 bool prep = false;
 bool preprange = false;
 bool save_sumr = false;
@@ -117,6 +117,7 @@ void saveVector(vector<vector<double> > arr, string filename, int ncols=2);
 void saveVector(vector<vector<array<double,2> > > arr, string filename);
 void saveVector(vector<vector<vector<array<double,2> > > > arr, string filename);
 void saveMFP(string filename);
+double getPHMFP(double de_ph,double e,double eps0,double epsinf);
 void saveQdep(int n_ene, int n_q, double q_max);
 void saveCoordVector(vector<vector<array<double,3> > > arr, vector<int> second, string filename);
 void printVector(vector<double> &arr);
@@ -172,7 +173,8 @@ class Electron
         ipolmfp = 0.0;
         if (ins)
         {
-            de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            de_ph = 0.145*EV2HA;
+            // de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             iphmfp = IPHMFP();
             ipolmfp = IPOLMFP();
         }
@@ -234,8 +236,8 @@ class Electron
         defl[1] = rn*2.*PI;
         if (sc_type == 0)
         {
-            double tot_elast_int = linterp2d(e+ef+eg,-1,ie_arr,elas_arr,true);
-            defl[0] = linterp2d(e+ef+eg,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
+            double tot_elast_int = linterp2d(e,-1,ie_arr,elas_arr,true);
+            defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
         else if (sc_type == 1)
@@ -261,17 +263,19 @@ class Electron
             }
             e = e-de;
             if (ins) {
-                double rn4 = random01();
-                de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                de_ph = 0.145*EV2HA;
+                // double rn4 = random01();
+                // de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             }
             died();
             if (! dead)
             {
                 if (ins) {
-                    double rn4 = random01();
-                    de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                    de_ph = 0.145*EV2HA;
+                //     double rn4 = random01();
+                //     de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
                     iphmfp = IPHMFP();
-                    ipolmfp = IPOLMFP();
+                //     ipolmfp = IPOLMFP();
                 }
                 iimfp = IIMFP();
                 iemfp = IEMFP();
@@ -283,6 +287,8 @@ class Electron
                 if (feg_dos)
                 {
                     s_ef = fzero(&jdos,0.,ef,de,rn5);
+                    if (ins)
+                        s_ef = ef - s_ef;
                 } else {
                     double s_ef_int0 = 0.0;
                     if (ef-de > 0)
@@ -294,9 +300,9 @@ class Electron
                 }
             } else {
                 s_ef = ef;
+                if (ins)
+                    s_ef = ef - s_ef;
             }
-            if (ins)
-                s_ef = ef - s_ef;
             valband.push_back(s_ef);
             return true;
         }
@@ -306,8 +312,8 @@ class Electron
             double bph = (e+e-de+2.0*sqrt(e*(e-de)))/(e+e-de-2.0*sqrt(e*(e-de)));
             defl[0] = acos((e+e-de)/(2.0*sqrt(e*(e-de)))*(1.0-pow(bph,rn2))+pow(bph,rn2));
             e = e-de;
-            double rn3 = random01();
-            de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            // double rn3 = random01();
+            // de_ph = linterp(rn3*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             
             died();
             if (! dead)
@@ -801,7 +807,7 @@ int main(int argc, char** argv)
                 nem++; // not emitted
             }
         }
-        saveVector(valband,checkName("mc_sef.plot"));
+        // saveVector(valband,checkName("mc_sef.plot"));
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
         {
@@ -815,7 +821,7 @@ int main(int argc, char** argv)
         }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
-        cout << "# Energy[eV]     SEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
+        cout << "# Energy[eV]     TEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
         if (noout) { cout.rdbuf(orig_buf); }
         cout << setw(12) << (erange-u0)*HA2EV;
         cout << setw(8) << (double)em/(double)mc_elec;
@@ -1362,11 +1368,11 @@ void readMaterialFile(string filename)
         eg = EV2HA*eg;
         ebeg = u0+1e-4;
     } else {
-        infile >> vol >> ef >> u0 >> wf;
+        infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
         wf = EV2HA*wf;
-        // u0 = ef+wf;
-        u0 = EV2HA*u0;
+        u0 = ef+wf;
+        // u0 = EV2HA*u0;
         ebeg = ef+1e-4;
     }
     vol = vol*ANG2BOHR*ANG2BOHR*ANG2BOHR;
@@ -1521,8 +1527,7 @@ void prepareJDOS(const vector<array<double,2> > &dos)
     vector<vector<array<double,2> > > arr3d;
     arr2d.reserve(200);
     arr2dint.reserve(200);
-    double d_ev;
-    d_ev = ef/200.;
+    double d_ev = ef/200.;
     for (size_t di = 0; di < de_arr.size(); di++)
     {
         for (int n_ev = 0; n_ev <= 200; n_ev++)
@@ -1738,6 +1743,14 @@ void saveVector(vector<vector<vector<array<double,2> > > > arr, string filename)
     }
 }
 
+double getPHMFP(double de_ph,double e,double eps0,double epsinf)
+{
+    double dephe = (de_ph)/e;
+    double sq_e = sqrt(1-dephe);
+    double kbt = 9.445e-4; 
+    return (eps0-epsinf)/(eps0*epsinf)*dephe*((1.0/(exp(de_ph/kbt)-1))+1.0)/2*log((1.0+sq_e)/(1.0-sq_e));
+}
+
 void saveMFP(string filename)
 {
     ofstream outfile(filename);
@@ -1756,7 +1769,8 @@ void saveMFP(string filename)
         } else {
             double iemfp_e = linterp2d(ie_arr[ee],-1,ie_arr,elas_arr,true)/vol;
             double iimfp_e = linterp2d(ie_arr[ee],-1,ie_arr,inel_arr,true);
-            outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << endl;
+            double iphmfp_e = getPHMFP(145e-3*EV2HA,ie_arr[ee],eps0,epsinf);
+            outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << " " << setprecision(17) << 1./iphmfp_e*BOHR2ANG << endl;
         }
     }
 }
