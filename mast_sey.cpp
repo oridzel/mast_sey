@@ -173,8 +173,7 @@ class Electron
         ipolmfp = 0.0;
         if (ins)
         {
-            de_ph = 0.145*EV2HA;
-            // de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+            de_ph = linterp(random01()*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             iphmfp = IPHMFP();
             ipolmfp = IPOLMFP();
         }
@@ -263,19 +262,17 @@ class Electron
             }
             e = e-de;
             if (ins) {
-                de_ph = 0.145*EV2HA;
-                // double rn4 = random01();
-                // de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                double rn4 = random01();
+                de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
             }
             died();
             if (! dead)
             {
                 if (ins) {
-                    de_ph = 0.145*EV2HA;
-                //     double rn4 = random01();
-                //     de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
+                    double rn4 = random01();
+                    de_ph = linterp(rn4*phdos_cumint[phdos_cumint.size()-1][1],phdos_cumint,true);
                     iphmfp = IPHMFP();
-                //     ipolmfp = IPOLMFP();
+                    ipolmfp = IPOLMFP();
                 }
                 iimfp = IIMFP();
                 iemfp = IEMFP();
