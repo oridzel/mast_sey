@@ -1740,14 +1740,6 @@ void saveVector(vector<vector<vector<array<double,2> > > > arr, string filename)
     }
 }
 
-double getPHMFP(double de_ph,double e,double eps0,double epsinf)
-{
-    double dephe = (de_ph)/e;
-    double sq_e = sqrt(1-dephe);
-    double kbt = 9.445e-4; 
-    return (eps0-epsinf)/(eps0*epsinf)*dephe*((1.0/(exp(de_ph/kbt)-1))+1.0)/2*log((1.0+sq_e)/(1.0-sq_e));
-}
-
 void saveMFP(string filename)
 {
     ofstream outfile(filename);
@@ -1766,8 +1758,7 @@ void saveMFP(string filename)
         } else {
             double iemfp_e = linterp2d(ie_arr[ee],-1,ie_arr,elas_arr,true)/vol;
             double iimfp_e = linterp2d(ie_arr[ee],-1,ie_arr,inel_arr,true);
-            double iphmfp_e = getPHMFP(145e-3*EV2HA,ie_arr[ee],eps0,epsinf);
-            outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << " " << setprecision(17) << 1./iphmfp_e*BOHR2ANG << endl;
+            outfile << setprecision(17) << ie_arr[ee]*HA2EV << " " << setprecision(17) << 1./iimfp_e*BOHR2ANG << " " << setprecision(17) << 1./iemfp_e*BOHR2ANG << endl;
         }
     }
 }
