@@ -467,7 +467,10 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
+            if (ins)
+                elas_arr.push_back(elas(ie_arr[i]+ef+eg,atnum[0],atcomp[0]));
+            else
+                elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
                 elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
