@@ -134,8 +134,6 @@ int printStars(int progr, int is, int size);
 double rand01();
 string checkName (string name);
 
-vector <double> valband;
-
 class Electron
 {
     public:
@@ -167,7 +165,10 @@ class Electron
         }
         defl[0] = 0.0;
         defl[1] = 0.0;
-        iemfp = IEMFP();
+        if (e-u0 < 5.0)
+            iemfp = 0.0;
+        else
+            iemfp = IEMFP();
         iimfp = IIMFP();
         iphmfp = 0.0;
         ipolmfp = 0.0;
@@ -235,21 +236,18 @@ class Electron
         defl[1] = rn*2.*PI;
         if (sc_type == 0)
         {
-            double tot_elast_int = linterp2d(e,-1,ie_arr,elas_arr,true);
-            defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
+            double tot_elast_int = linterp2d(e-u0,-1,ie_arr,elas_arr,true);
+            defl[0] = linterp2d(e-u0,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
         else if (sc_type == 1)
         {
             double detot_inel_int = linterp2d(e,-1,ie_arr,inel_arr,true);
-            de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
-            if (ins && de < eg)
-            {
-                // cout << "de = " << de << ", eg = " << eg << endl;
-                de = eg;
+            de = 0.0;   
+            while (de <= eg) {
+                rn2 = random01();
+                de = linterp2d(e,rn2*detot_inel_int,ie_arr,inel_arr,false,true);
             }
-            if (ins && de > e)
-                cout << "de = " << de << ", e = " << e << endl;
             if (classical_ang)
             {
                 defl[0] = asin(sqrt(de/e));
@@ -275,7 +273,10 @@ class Electron
                     ipolmfp = IPOLMFP();
                 }
                 iimfp = IIMFP();
-                iemfp = IEMFP();
+                if (e-u0 < 5.0)
+                    iemfp = 0.0;
+                else
+                    iemfp = IEMFP();
                 itmfp = iemfp+iimfp+iphmfp+ipolmfp;
             }
             if (use_dos) 
@@ -294,13 +295,15 @@ class Electron
                     }
                     double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
+                    if (ins)
+                        s_ef = ef - s_ef;
                 }
             } else {
-                s_ef = ef;
                 if (ins)
-                    s_ef = ef - s_ef;
+                    s_ef = 0.0;
+                else
+                    s_ef = ef;
             }
-            valband.push_back(s_ef);
             return true;
         }
         else if (sc_type == 2)
@@ -316,7 +319,10 @@ class Electron
             if (! dead)
             {
                 iimfp = IIMFP();
-                iemfp = IEMFP();
+                if (e-u0 < 5.0)
+                    iemfp = 0.0;
+                else
+                    iemfp = IEMFP();
                 iphmfp = IPHMFP();
                 ipolmfp = IPOLMFP();
                 itmfp = iemfp+iimfp+iphmfp+ipolmfp;
@@ -347,7 +353,7 @@ class Electron
     {
         if (ins)
         {
-            double dephe = (de_ph)/e;
+            double dephe = de_ph/e;
             double sq_e = sqrt(1-dephe);
             double kbt = 9.445e-4; 
             return (eps0-epsinf)/(eps0*epsinf)*dephe*((1.0/(exp(de_ph/kbt)-1))+1.0)/2*log((1.0+sq_e)/(1.0-sq_e));
@@ -467,16 +473,10 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            if (ins)
-                elas_arr.push_back(elas(ie_arr[i]+ef+eg,atnum[0],atcomp[0]));
-            else
-                elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
+            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                if (ins)
-                    elas_alloy_arr = elas(ie_arr[i]+ef+eg,atnum[ia],atcomp[ia]);
-                else
-                    elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
+                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -780,7 +780,7 @@ int main(int argc, char** argv)
                 coord_vec.push_back(elec_arr[ei].coord);
                 secondary_ind.push_back(elec_arr[ei].secondary);
             }
-            if (! elec_arr[ei].inside)
+            if (! elec_arr[ei].inside && ! elec_arr[ei].dead)
             {
                 em++; // emitted
                 if (elec_arr[ei].isse)
@@ -790,14 +790,11 @@ int main(int argc, char** argv)
                 else {
                     bsc++; // backscattered pe
                 }
-                // if (elec_arr[ei].e < 50.*EV2HA)
-                // {
                 if (distrib)
                 {// ene,theta,phi,x,y,secondary
                     // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
                     ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1]});
                 }
-                // }
                 if (elec_arr[ei].secondary == 0 && elec_arr[ei].e > (erange-u0)-0.0001)
                 {
                     e_bsc++; // elastically backscattered 
@@ -810,7 +807,6 @@ int main(int argc, char** argv)
                 nem++; // not emitted
             }
         }
-        // saveVector(valband,checkName("mc_sef.plot"));
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
         if (distrib)
         {
@@ -1369,6 +1365,7 @@ void readMaterialFile(string filename)
         ef = EV2HA*ef;
         u0 = EV2HA*u0;
         eg = EV2HA*eg;
+        // u0 = ef+chi+eg;
         ebeg = u0+1e-4;
     } else {
         infile >> vol >> ef >> wf;
