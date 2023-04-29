@@ -736,7 +736,7 @@ int main(int argc, char** argv)
 
                 if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
                 {
-                    if (i > 0 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                    if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
                     {
                         coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
                     }
