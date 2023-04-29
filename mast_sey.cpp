@@ -28,7 +28,7 @@ streambuf* orig_buf = cout.rdbuf();
 
 vector<double> ie_arr, q_arr, de_arr;
 vector<vector<array<double,2> > > inel_arr, elas_arr, ene_elf, jdos_arr;
-vector<array<double,2> > elas_alloy_arr, dos_arr, phdos_arr, phdos_cumint;
+vector<array<double,2> > elas_alloy_arr, dos_arr, xin_arr, phdos_arr, phdos_cumint;
 
 int dircos_algo = 0;
 int spher_sec = 0;
@@ -60,6 +60,7 @@ bool prep = false;
 bool preprange = false;
 bool save_sumr = false;
 bool save_qdep = false;
+bool save_dmfp = false;
 int sq_egrid, sq_qgrid;
 double sq_qmax;
 bool save_coords = false;
@@ -108,6 +109,7 @@ double spa_dispers(double w0, double w, double q);
 double spa_elf(double w, double q);
 double elfq(double q, double om, int dq=1);
 double qIntFun(double om, double ie, int dummy);
+vector<array<double,2> > diimfp(double (*f)(double,double,int), double x0, double x1, int ndiv, double args);
 
 void prepareJDOS(const vector<array<double,2> > &dos);
 void saveVector(vector<double> arr, string filename);
@@ -142,14 +144,16 @@ class Electron
         double angles[2];
         double defl[2];
         int sc_type;
+        int parent_index;
         array<int,4> sc_type_counts{0,0,0,0};
         array<double,3> xyz{0.,0.,0.};
         array<double,3> uvw{0.,0.,1.};
         vector<array<double,3> > coord;
         bool inside, dead, isse;
-    Electron(double ie, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0, bool se=false)
+    Electron(double ie, int index, double x=0.0, double y=0.0, double z=0.0, double u=0.0, double v=0.0, double w=1.0, int sec=0, bool se=false)
     {
         e = ie;
+        parent_index = index;
         de = 0.0;
         xyz[0] = x;
         xyz[1] = y;
@@ -165,10 +169,7 @@ class Electron
         }
         defl[0] = 0.0;
         defl[1] = 0.0;
-        if (e-u0 < 5.0)
-            iemfp = 0.0;
-        else
-            iemfp = IEMFP();
+        iemfp = IEMFP();
         iimfp = IIMFP();
         iphmfp = 0.0;
         ipolmfp = 0.0;
@@ -236,8 +237,8 @@ class Electron
         defl[1] = rn*2.*PI;
         if (sc_type == 0)
         {
-            double tot_elast_int = linterp2d(e-u0,-1,ie_arr,elas_arr,true);
-            defl[0] = linterp2d(e-u0,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
+            double tot_elast_int = linterp2d(e,-1,ie_arr,elas_arr,true);
+            defl[0] = linterp2d(e,rn2*tot_elast_int,ie_arr,elas_arr,false,true);
             return false;
         }
         else if (sc_type == 1)
@@ -273,10 +274,7 @@ class Electron
                     ipolmfp = IPOLMFP();
                 }
                 iimfp = IIMFP();
-                if (e-u0 < 5.0)
-                    iemfp = 0.0;
-                else
-                    iemfp = IEMFP();
+                iemfp = IEMFP();
                 itmfp = iemfp+iimfp+iphmfp+ipolmfp;
             }
             if (use_dos) 
@@ -319,10 +317,7 @@ class Electron
             if (! dead)
             {
                 iimfp = IIMFP();
-                if (e-u0 < 5.0)
-                    iemfp = 0.0;
-                else
-                    iemfp = IEMFP();
+                iemfp = IEMFP();
                 iphmfp = IPHMFP();
                 ipolmfp = IPOLMFP();
                 itmfp = iemfp+iimfp+iphmfp+ipolmfp;
@@ -487,7 +482,15 @@ int main(int argc, char** argv)
             if(!emfp_only)
             {
                 if (ins)
+                {
                     inel_arr.push_back(inel(ie_arr[i]+ef+eg));
+                    if (save_dmfp)
+                    {
+                        xin_arr = diimfp(&qIntFun,0,ie_arr[i],4096,ie_arr[i]+ef+eg);
+                        saveVector(xin_arr, "mgoe"+to_string(int(round(ie_arr[i]*HA2EV)))+".dmfp");
+                        xin_arr.clear();
+                    }
+                }
                 else
                     inel_arr.push_back(inel(ie_arr[i]));
             }
@@ -605,7 +608,6 @@ int main(int argc, char** argv)
         print("# Input files read");
         print("# Starting mc_sey in \"Simulation\" mode to get SEY\n#");
         vector<Electron > elec_arr;
-        vector<Electron > detected_elec_arr;
         vector<vector<double >> coin_arr;
         vector<double> singles_arr;
         ini_angle = asin(sin(ini_angle)*sqrt((erange-u0)/erange));
@@ -615,9 +617,6 @@ int main(int argc, char** argv)
         array<double,3> s_xyz{0.0,0.0,0.0};
         i = -1;
         progress = 0;
-        int halfpair = 0;
-        int n_pe = 0;
-        int n_se = 0;
         auto t1 = std::chrono::high_resolution_clock::now();
 
         for (int n_e = 0; n_e < mc_elec; n_e++)
@@ -630,9 +629,7 @@ int main(int argc, char** argv)
                 printProgress();
             }
             progress = printStars(progress,n_e,mc_elec);
-            elec_arr.push_back(Electron(erange,0.0,0.0,0.0,sin(ini_angle),0.0,cos(ini_angle),0,false));
-            halfpair = 0;
-            if (n_e > 0) detected_elec_arr.clear();
+            elec_arr.push_back(Electron(erange,-1,0.0,0.0,0.0,sin(ini_angle),0.0,cos(ini_angle),0,false));
             while (i < (int)elec_arr.size()-1)
             {
                 i++;
@@ -688,7 +685,7 @@ int main(int argc, char** argv)
                                 } else {
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
+                                elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             } // no secondary if bound and small energy
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
@@ -710,7 +707,7 @@ int main(int argc, char** argv)
                                 } else {
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
+                                elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
                             else if (!ins && elec_arr[i].de+elec_arr[i].s_ef>u0 && elec_arr[i].de+elec_arr[i].s_ef>ef+eg)
                             {
@@ -730,43 +727,20 @@ int main(int argc, char** argv)
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
                                 elec_arr[i].num_se += 1;
-                                elec_arr.push_back(Electron(s_ene,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
+                                elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
                             }
                         } 
                         elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
                 }
-                if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
-                {
-                    if (halfpair == 0)
-                    {
-                        n_pe = i;
-                        halfpair = 1;
-                    }
-                    else
-                    {
-                        if (halfpair == 1)
-                        {
-                            n_se = i;
-                            halfpair = 2;
-                        }
-                        else
-                            halfpair += 1;
-                    }
-                }
 
                 if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
                 {
-                    detected_elec_arr.push_back(elec_arr[i]);
+                    if (i > 0 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                    {
+                        coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
+                    }
                 }
-            }
-            if (halfpair == 1 && coin)
-            {
-                singles_arr.push_back(elec_arr[n_pe].e*HA2EV);
-            }
-            if (halfpair == 2 && coin)
-            {
-                coin_arr.push_back({elec_arr[n_pe].e*HA2EV, elec_arr[n_se].e*HA2EV});
             }
         }
         vector<vector<array<double,3> > > coord_vec;
@@ -929,6 +903,7 @@ void getInput(int argc, char** argv)
         if (strcmp(argv[i], "-nostep") == 0) { step = false; }
         if (strcmp(argv[i], "-emfp") == 0) { emfp_only = true; }
         if (strcmp(argv[i], "-coin") == 0) { coin = true; }
+        if (strcmp(argv[i], "-dmfp") == 0) { save_dmfp = true; }
         if (strcmp(argv[i], "LDA") == 0) { es_mcpol = 2; }
 
         if (strcmp(argv[i], "SOLID") == 0)
@@ -1908,6 +1883,22 @@ vector<array<double,2> > int_elastic_ang(const vector<double> &xarr, const vecto
         int_arr.push_back({xarr[xarr.size()],2.*PI*intgrl});
         return int_arr;
     }
+}
+
+vector<array<double,2> > diimfp(double (*f)(double,double,int), double x0, double x1, int ndiv, double args)
+{
+    double x = x0;
+    double dx = (x1-x0)/ndiv;
+    vector<array<double,2> > xin;
+    for (int i = 0; i < ndiv; i++)
+    {
+        if (x == 0.0)
+            xin.push_back({x*HA2EV,0.0});
+        else
+            xin.push_back({x*HA2EV,(*f)(x,args,1)*EV2HA*ANG2BOHR});
+        x = x+dx;
+    }
+    return xin;
 }
 
 vector<array<double,2> > int_inelastic_ene(double (*f)(double,double,int), double x0, double x1, int ndiv, double args, bool cumint)
