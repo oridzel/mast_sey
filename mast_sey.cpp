@@ -609,7 +609,6 @@ int main(int argc, char** argv)
         print("# Starting mc_sey in \"Simulation\" mode to get SEY\n#");
         vector<Electron > elec_arr;
         vector<vector<double >> coin_arr;
-        vector<double> singles_arr;
         ini_angle = asin(sin(ini_angle)*sqrt((erange-u0)/erange));
         int i, progress;
         double s_ene;
@@ -790,7 +789,6 @@ int main(int argc, char** argv)
         if (coin)
         {
             saveVector(coin_arr,checkName("mc_coin.plot"),2);
-            saveVector(singles_arr,checkName("mc_singles.plot"));
         }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
