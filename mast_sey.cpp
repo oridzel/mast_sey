@@ -76,6 +76,7 @@ bool ins = false;
 double eg = 0.0, eps0 = 0.0, epsinf = 0.0;
 bool polaron = false;
 double s_trap = 0.0, gamma_trap = 0.0;
+bool vbref = true;
 
 string getTime();
 void getInput(int argc, char** argv);
@@ -283,7 +284,7 @@ class Electron
                 if (feg_dos)
                 {
                     s_ef = fzero(&jdos,0.,ef,de,rn5);
-                    if (ins)
+                    if (ins && ! vbref)
                         s_ef = ef - s_ef;
                 } else {
                     double s_ef_int0 = 0.0;
@@ -293,11 +294,11 @@ class Electron
                     }
                     double s_ef_int = linterp2d(de,-1,de_arr,jdos_arr,true);
                     s_ef = linterp2d(de,s_ef_int0+(s_ef_int-s_ef_int0)*rn5,de_arr,jdos_arr,false,true);
-                    if (ins)
+                    if (ins && ! vbref)
                         s_ef = ef - s_ef;
                 }
             } else {
-                if (ins)
+                if (ins && ! vbref)
                     s_ef = 0.0;
                 else
                     s_ef = ef;
@@ -435,6 +436,9 @@ int main(int argc, char** argv)
         if (strcmp(argv[i], "-ins") == 0) {
             ins = true;
         }
+        else if (strcmp(argv[i], "-cbref") == 0) {
+            vbref = false;
+        }
     }
     readMaterialFile();
     getInput(argc,argv);
@@ -468,10 +472,12 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0]));
+            if (ins && ! vbref) { elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0])); }
+            else { elas_arr.push_back(elas(ie_arr[i]-ef-eg,atnum[0],atcomp[0])); }
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]);
+                if (ins && ! vbref) { elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]); }
+                else { elas_alloy_arr = elas(ie_arr[i]-ef-eg,atnum[ia],atcomp[ia]); }
                 for (int k = 0; k < 606; k++)
                 {
                     elas_arr[i][k][1] = elas_arr[i][k][1]+elas_alloy_arr[k][1];
@@ -481,18 +487,14 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                if (ins)
+                if (ins && ! vbref) { inel_arr.push_back(inel(ie_arr[i]+ef+eg)); }
+                else { inel_arr.push_back(inel(ie_arr[i])); }
+                if (save_dmfp)
                 {
-                    inel_arr.push_back(inel(ie_arr[i]+ef+eg));
-                    if (save_dmfp)
-                    {
-                        xin_arr = diimfp(&qIntFun,0,ie_arr[i],4096,ie_arr[i]+ef+eg);
-                        saveVector(xin_arr, "mgoe"+to_string(int(round(ie_arr[i]*HA2EV)))+".dmfp");
-                        xin_arr.clear();
-                    }
+                    xin_arr = diimfp(&qIntFun,0,ie_arr[i],4096,ie_arr[i]+ef+eg);
+                    saveVector(xin_arr, "e"+to_string(int(round(ie_arr[i]*HA2EV)))+".dmfp");
+                    xin_arr.clear();
                 }
-                else
-                    inel_arr.push_back(inel(ie_arr[i]));
             }
         }
         if (preprange)
@@ -689,7 +691,7 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            else if (ins && elec_arr[i].de-elec_arr[i].s_ef-eg>u0)
+                            else if (ins && ! vbref && elec_arr[i].de-elec_arr[i].s_ef-eg>u0)
                             {
                                 s_ene = elec_arr[i].de-elec_arr[i].s_ef-eg;
                                 s_xyz[0] = elec_arr[i].xyz[0];
@@ -708,7 +710,7 @@ int main(int argc, char** argv)
                                 }
                                 elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
-                            else if (!ins && elec_arr[i].de+elec_arr[i].s_ef>u0 && elec_arr[i].de+elec_arr[i].s_ef>ef+eg)
+                            else if (elec_arr[i].de+elec_arr[i].s_ef>u0)
                             {
                                 s_ene = elec_arr[i].de+elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
@@ -726,18 +728,27 @@ int main(int argc, char** argv)
                                     s_uvw = f_rotdircos(elec_arr[i].uvw,asin(cos(elec_arr[i].defl[0])),elec_arr[i].defl[1]+PI);
                                 }
                                 elec_arr[i].num_se += 1;
-                                elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1));
+                                elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
                         } 
                         elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
                 }
-
                 if (! elec_arr[i].dead && ! elec_arr[i].inside && coin)
                 {
-                    if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                    if (vbref)
                     {
-                        coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de+elec_arr[elec_arr[i].parent_index].s_ef )
+                        {
+                            coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
+                        }
+                    }
+                    else
+                    {
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                        {
+                            coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
+                        }
                     }
                 }
             }
@@ -1334,12 +1345,15 @@ void readMaterialFile(string filename)
         exit(1);
     }
     if (ins) {
-        infile >> vol >> ef >> u0 >> eg >> eps0 >> epsinf;
+        infile >> vol >> ef >> wf >> eg >> eps0 >> epsinf;
         ef = EV2HA*ef;
-        u0 = EV2HA*u0;
+        wf = EV2HA*wf;
         eg = EV2HA*eg;
-        // u0 = ef+chi+eg;
-        ebeg = u0+1e-4;
+        if (vbref)
+            u0 = ef+wf+eg;
+        else
+            u0 = wf;
+        ebeg = u0;
     } else {
         infile >> vol >> ef >> wf;
         ef = EV2HA*ef;
