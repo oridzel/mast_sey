@@ -379,7 +379,7 @@ class Electron
                 if (step)
                 { t = 4.*sqrt(1.-u0/ecos)/pow((1.+sqrt(1.-u0/ecos)),2); }
                 else
-                { t = 1.-pow(wf,4)/(8.*pow(wf+(ecos-u0),3)+pow(wf,4)); }
+                { t = 1.-pow(wf+eg,4)/(8.*pow(wf+eg+(ecos-u0),3)+pow(wf+eg,4)); }
             }
             else
             {
@@ -710,7 +710,7 @@ int main(int argc, char** argv)
                                 }
                                 elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
-                            else if (elec_arr[i].de+elec_arr[i].s_ef>u0)
+                            else if (vbref && elec_arr[i].de+elec_arr[i].s_ef>u0)
                             {
                                 s_ene = elec_arr[i].de+elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
