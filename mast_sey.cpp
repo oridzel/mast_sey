@@ -472,11 +472,11 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            if (ins && ! vbref) { elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0])); }
+            if (ins && ! vbref) { elas_arr.push_back(elas(ie_arr[i]-eg,atnum[0],atcomp[0])); }
             else { elas_arr.push_back(elas(ie_arr[i]-ef-eg,atnum[0],atcomp[0])); }
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                if (ins && ! vbref) { elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]); }
+                if (ins && ! vbref) { elas_alloy_arr = elas(ie_arr[i]-eg,atnum[ia],atcomp[ia]); }
                 else { elas_alloy_arr = elas(ie_arr[i]-ef-eg,atnum[ia],atcomp[ia]); }
                 for (int k = 0; k < 606; k++)
                 {
@@ -487,7 +487,7 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                if (ins && ! vbref) { inel_arr.push_back(inel(ie_arr[i]+ef+eg)); }
+                if (ins && ! vbref) { inel_arr.push_back(inel(ie_arr[i]+ef)); }
                 else { inel_arr.push_back(inel(ie_arr[i])); }
                 if (save_dmfp)
                 {
@@ -691,9 +691,9 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            else if (ins && ! vbref && elec_arr[i].de-elec_arr[i].s_ef-eg>u0)
+                            else if (ins && ! vbref && elec_arr[i].de-elec_arr[i].s_ef>u0)
                             {
-                                s_ene = elec_arr[i].de-elec_arr[i].s_ef-eg;
+                                s_ene = elec_arr[i].de-elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
                                 s_xyz[2] = elec_arr[i].xyz[2];
@@ -710,7 +710,7 @@ int main(int argc, char** argv)
                                 }
                                 elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
-                            else if (elec_arr[i].de+elec_arr[i].s_ef>u0)
+                            else if (vbref && elec_arr[i].de+elec_arr[i].s_ef>u0)
                             {
                                 s_ene = elec_arr[i].de+elec_arr[i].s_ef;
                                 s_xyz[0] = elec_arr[i].xyz[0];
@@ -745,7 +745,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef )
                         {
                             coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
                         }
@@ -1352,7 +1352,7 @@ void readMaterialFile(string filename)
         if (vbref)
             u0 = ef+wf+eg;
         else
-            u0 = wf;
+            u0 = wf+eg;
         ebeg = u0;
     } else {
         infile >> vol >> ef >> wf;
@@ -2071,10 +2071,10 @@ vector<array<double,2> > elas(double ie, int at, double comp, double rmuf)
             }
             if(rmuf < 0)
             {
-                string command = "getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(1);
+                string command = "sh getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(ie)+" "+to_string(1);
                 system(command.c_str());
             } else {
-                string command = "getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(1)+" "+to_string(rmuf);
+                string command = "sh getDDCS "+to_string(es_nuc)+" "+to_string(es_el)+" "+to_string(es_ex)+" "+to_string(es_muffin)+" "+to_string(es_mcpol)+" "+to_string(at)+" "+to_string(ie*HA2EV)+" "+to_string(ie)+" "+to_string(1)+" "+to_string(rmuf);
                 system(command.c_str());
             }
         }
