@@ -379,7 +379,7 @@ class Electron
                 if (step)
                 { t = 4.*sqrt(1.-u0/ecos)/pow((1.+sqrt(1.-u0/ecos)),2); }
                 else
-                { t = 1.-pow(wf,4)/(8.*pow(wf+(ecos-u0),3)+pow(wf,4)); }
+                { t = 1.-pow(wf+eg,4)/(8.*pow(wf+eg+(ecos-u0),3)+pow(wf+eg,4)); }
             }
             else
             {
