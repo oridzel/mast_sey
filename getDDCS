@@ -7,8 +7,8 @@ ES_MUF=$4
 ES_POL=$5
 ATNUM=$6
 EV_IE=$7
-EV_HA=$(bc -l <<< ${EV_IE}/27.2114)
-ELS=$8
+EV_HA=$8
+ELS=$9
 if [ ${ES_EL} -eq 4 ]
 then
     if [ ! -f z_$(printf "%03d" ${ATNUM}).den ]
