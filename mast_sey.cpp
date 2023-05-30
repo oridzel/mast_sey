@@ -140,7 +140,7 @@ string checkName (string name);
 class Electron
 {
     public:
-        double e,de,de_ph,iimfp,iemfp,itmfp,iphmfp,ipolmfp,s_ef,pathlength;
+        double e,de,de_ph,iimfp,iemfp,itmfp,iphmfp,ipolmfp,s_ef,pathlength,depth;
         int secondary,num_se;
         double angles[2];
         double defl[2];
@@ -185,6 +185,7 @@ class Electron
         dead = false;
         secondary = sec;
         pathlength = 0.0;
+        depth = xyz[2];
     }
     void travel_s()
     {
@@ -472,11 +473,11 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < ie_arr.size(); i++)
         {
             progress = printStars(progress,i,ie_arr.size());
-            if (ins && ! vbref) { elas_arr.push_back(elas(ie_arr[i]-eg,atnum[0],atcomp[0])); }
+            if (ins && ! vbref) { elas_arr.push_back(elas(ie_arr[i],atnum[0],atcomp[0])); }
             else { elas_arr.push_back(elas(ie_arr[i]-ef-eg,atnum[0],atcomp[0])); }
             for (size_t ia = 1; ia < atnum.size(); ia++)
             {
-                if (ins && ! vbref) { elas_alloy_arr = elas(ie_arr[i]-eg,atnum[ia],atcomp[ia]); }
+                if (ins && ! vbref) { elas_alloy_arr = elas(ie_arr[i],atnum[ia],atcomp[ia]); }
                 else { elas_alloy_arr = elas(ie_arr[i]-ef-eg,atnum[ia],atcomp[ia]); }
                 for (int k = 0; k < 606; k++)
                 {
@@ -487,7 +488,7 @@ int main(int argc, char** argv)
 
             if(!emfp_only)
             {
-                if (ins && ! vbref) { inel_arr.push_back(inel(ie_arr[i]+ef)); }
+                if (ins && ! vbref) { inel_arr.push_back(inel(ie_arr[i]+ef+eg)); }
                 else { inel_arr.push_back(inel(ie_arr[i])); }
                 if (save_dmfp)
                 {
@@ -691,9 +692,9 @@ int main(int argc, char** argv)
                             else if (elec_arr[i].de-eb>0.0 && eb>0.001) {}
                             // otherwise secondary from fermi sea if more than gap
                             // valence band interaction (insulators)
-                            else if (ins && ! vbref && elec_arr[i].de-elec_arr[i].s_ef>u0)
+                            else if (ins && ! vbref && elec_arr[i].de-elec_arr[i].s_ef-eg>u0)
                             {
-                                s_ene = elec_arr[i].de-elec_arr[i].s_ef;
+                                s_ene = elec_arr[i].de-elec_arr[i].s_ef-eg;
                                 s_xyz[0] = elec_arr[i].xyz[0];
                                 s_xyz[1] = elec_arr[i].xyz[1];
                                 s_xyz[2] = elec_arr[i].xyz[2];
@@ -745,7 +746,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef )
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
                         {
                             coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
                         }
@@ -764,6 +765,11 @@ int main(int argc, char** argv)
                 coord_vec.push_back(elec_arr[ei].coord);
                 secondary_ind.push_back(elec_arr[ei].secondary);
             }
+            if (distrib)
+            {// ene,theta,phi,x,y,secondary
+                // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
+                ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth,elec_arr[ei].inside,elec_arr[ei].dead});
+            }
             if (! elec_arr[ei].inside && ! elec_arr[ei].dead)
             {
                 em++; // emitted
@@ -774,11 +780,11 @@ int main(int argc, char** argv)
                 else {
                     bsc++; // backscattered pe
                 }
-                if (distrib)
-                {// ene,theta,phi,x,y,secondary
-                    // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
-                    ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1]});
-                }
+                // if (distrib)
+                // {// ene,theta,phi,x,y,secondary
+                //     // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
+                //     ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth});
+                // }
                 if (elec_arr[ei].secondary == 0 && elec_arr[ei].e > (erange-u0)-0.0001)
                 {
                     e_bsc++; // elastically backscattered 
@@ -795,12 +801,13 @@ int main(int argc, char** argv)
         if (distrib)
         {
             // saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
-            saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
+            saveVector(ene_distrib,checkName("mc_distrib.plot"),7);
         }
         if (coin)
         {
             saveVector(coin_arr,checkName("mc_coin.plot"),2);
         }
+        saveVector(ene_distrib,checkName("mc_distrib.plot"),9);
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     TEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
@@ -1352,7 +1359,7 @@ void readMaterialFile(string filename)
         if (vbref)
             u0 = ef+wf+eg;
         else
-            u0 = wf+eg;
+            u0 = wf;
         ebeg = u0;
     } else {
         infile >> vol >> ef >> wf;
@@ -1697,7 +1704,19 @@ void saveVector(vector<vector<double> > arr, string filename, int ncols)
     {
         for (size_t i = 0; i < arr.size(); i++)
         {
-            outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << arr[i][5] << endl;
+            outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << endl;
+        }
+    } else if (ncols==7)
+    {
+        for (size_t i = 0; i < arr.size(); i++)
+        {
+            outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << endl;
+        }
+    } else if (ncols==9)
+    {
+        for (size_t i = 0; i < arr.size(); i++)
+        {
+            outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << " " << int(arr[i][7]) << " " << int(arr[i][8]) << endl;
         }
     } else { cerr << "Something went wrong with saveVector" << endl; exit(1); }
 }
