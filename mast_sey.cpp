@@ -801,13 +801,12 @@ int main(int argc, char** argv)
         if (distrib)
         {
             // saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
-            saveVector(ene_distrib,checkName("mc_distrib.plot"),7);
+            saveVector(ene_distrib,checkName("mc_distrib.plot"),9);
         }
         if (coin)
         {
             saveVector(coin_arr,checkName("mc_coin.plot"),2);
         }
-        saveVector(ene_distrib,checkName("mc_distrib.plot"),9);
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     TEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
