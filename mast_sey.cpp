@@ -758,17 +758,19 @@ int main(int argc, char** argv)
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
+        if (distrib)
+        {
+            print("\n#");
+            print("Electron data statistics:\n#");
+            cout << fixed << setprecision(4) << setfill(' ');
+            cout << "# Energy[eV]   Is secondary?   Number of inelastic events  Electron generation Theta    Phi    Creation depth[A]" << endl;
+        }
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
             if (save_coords)
             {
                 coord_vec.push_back(elec_arr[ei].coord);
                 secondary_ind.push_back(elec_arr[ei].secondary);
-            }
-            if (distrib)
-            {// ene,theta,phi,x,y,secondary
-                // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
-                ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth,elec_arr[ei].inside,elec_arr[ei].dead});
             }
             if (! elec_arr[ei].inside && ! elec_arr[ei].dead)
             {
@@ -780,11 +782,6 @@ int main(int argc, char** argv)
                 else {
                     bsc++; // backscattered pe
                 }
-                // if (distrib)
-                // {// ene,theta,phi,x,y,secondary
-                //     // ene_distrib.push_back({elec_arr[ei].e*HA2EV,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].xyz[0],elec_arr[ei].xyz[1],(double)elec_arr[ei].secondary});
-                //     ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth});
-                // }
                 if (elec_arr[ei].secondary == 0 && elec_arr[ei].e > (erange-u0)-0.0001)
                 {
                     e_bsc++; // elastically backscattered 
@@ -793,20 +790,23 @@ int main(int argc, char** argv)
                 {
                     d_prim++; // diffused primaries 
                 }
+                if (distrib)
+                {
+                    cout << setw(8) << round(elec_arr[ei].e*HA2EV*10000)/10000;
+                    cout << setw(8) << (double)elec_arr[ei].isse;
+                    cout << setw(8) << (double)elec_arr[ei].sc_type_counts[1];
+                    cout << setw(8) << (double)elec_arr[ei].secondary;
+                    cout << setw(8) << round(elec_arr[ei].angles[0]*10000)/10000;
+                    cout << setw(8) << round(elec_arr[ei].angles[1]*10000)/10000;
+                    cout << setw(8) << round(elec_arr[ei].depth*BOHR2ANG*10000)/10000 << endl;
+                //     ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth});
+                }
             } else {
                 nem++; // not emitted
             }
         }
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
-        if (distrib)
-        {
-            // saveVector(ene_distrib,checkName("mc_distrib.plot"),6);
-            saveVector(ene_distrib,checkName("mc_distrib.plot"),9);
-        }
-        if (coin)
-        {
-            saveVector(coin_arr,checkName("mc_coin.plot"),2);
-        }
+        // if (distrib) { saveVector(ene_distrib,checkName("mc_distrib.plot"),9); }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     TEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
@@ -817,6 +817,13 @@ int main(int argc, char** argv)
         cout << setw(8) << (double)bsc/(double)mc_elec;
         cout << setw(8) << (double)d_prim/(double)mc_elec;
         cout << setw(8) << (double)e_bsc/(double)mc_elec << endl;
+        if (coin)
+        {
+            string fname = checkName("out/e" + to_string(int((erange-u0)*HA2EV)) + "coincidences.plot");
+            print("\n#");
+            cout << "# Saving coincidences to " << fname << "..." << endl;
+            saveVector(coin_arr,fname,2);
+        }
         return 0;
     }
     return 0;
