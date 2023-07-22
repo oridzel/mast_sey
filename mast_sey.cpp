@@ -612,6 +612,7 @@ int main(int argc, char** argv)
         print("# Starting mc_sey in \"Simulation\" mode to get SEY\n#");
         vector<Electron > elec_arr;
         vector<vector<double >> coin_arr;
+        vector<vector<double> > stat_arr;
         ini_angle = asin(sin(ini_angle)*sqrt((erange-u0)/erange));
         int i, progress;
         double s_ene;
@@ -731,6 +732,10 @@ int main(int argc, char** argv)
                                 elec_arr[i].num_se += 1;
                                 elec_arr.push_back(Electron(s_ene,i,s_xyz[0],s_xyz[1],s_xyz[2],s_uvw[0],s_uvw[1],s_uvw[2],elec_arr[i].secondary+1,true));
                             }
+                            if (distrib)
+                            {
+                                stat_arr.push_back({(double)i,elec_arr[i].e*HA2EV,elec_arr[i].de*HA2EV,(double)elec_arr[i].isse,(double)elec_arr[i].sc_type_counts[1],(double)elec_arr[i].secondary,elec_arr[i].depth*BOHR2ANG,elec_arr[i].xyz[2]*BOHR2ANG});
+                            }
                         } 
                         elec_arr[i].uvw = f_rotdircos(elec_arr[i].uvw,elec_arr[i].defl[0],elec_arr[i].defl[1]);
                     }
@@ -739,14 +744,16 @@ int main(int argc, char** argv)
                 {
                     if (vbref)
                     {
-                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de+elec_arr[elec_arr[i].parent_index].s_ef )
+                        // if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de+elec_arr[elec_arr[i].parent_index].s_ef )
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside )
                         {
                             coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
                         }
                     }
                     else
                     {
-                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                        // if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside && elec_arr[i].e+u0 == elec_arr[elec_arr[i].parent_index].de-elec_arr[elec_arr[i].parent_index].s_ef-eg )
+                        if (elec_arr[i].parent_index != -1 && ! elec_arr[elec_arr[i].parent_index].dead && ! elec_arr[elec_arr[i].parent_index].inside )
                         {
                             coin_arr.push_back({elec_arr[elec_arr[i].parent_index].e*HA2EV, elec_arr[i].e*HA2EV});
                         }
@@ -758,13 +765,13 @@ int main(int argc, char** argv)
         vector<int> secondary_ind;
         vector<vector<double> > ene_distrib;
         int em = 0, tem = 0, bsc = 0, nem = 0, d_prim = 0, e_bsc = 0;
-        if (distrib)
-        {
-            print("\n#");
-            print("Electron data statistics:\n#");
-            cout << fixed << setprecision(4) << setfill(' ');
-            cout << "# Energy[eV]   Is secondary?   Number of inelastic events  Electron generation Theta    Phi    Creation depth[A]" << endl;
-        }
+        // if (distrib)
+        // {
+        //     print("\n#");
+        //     print("Electron data statistics:\n#");
+        //     cout << fixed << setprecision(4) << setfill(' ');
+        //     cout << "# Energy[eV]   Is secondary?   Number of inelastic events  Electron generation Theta    Phi    Creation depth[A]" << endl;
+        // }
         for (size_t ei = 0; ei < elec_arr.size()-1; ei++)
         {
             if (save_coords)
@@ -790,23 +797,33 @@ int main(int argc, char** argv)
                 {
                     d_prim++; // diffused primaries 
                 }
-                if (distrib)
-                {
-                    cout << setw(8) << round(elec_arr[ei].e*HA2EV*10000)/10000;
-                    cout << setw(8) << (double)elec_arr[ei].isse;
-                    cout << setw(8) << (double)elec_arr[ei].sc_type_counts[1];
-                    cout << setw(8) << (double)elec_arr[ei].secondary;
-                    cout << setw(8) << round(elec_arr[ei].angles[0]*10000)/10000;
-                    cout << setw(8) << round(elec_arr[ei].angles[1]*10000)/10000;
-                    cout << setw(8) << round(elec_arr[ei].depth*BOHR2ANG*10000)/10000 << endl;
+                // if (distrib)
+                // {
+                //     // cout << setw(8) << round(elec_arr[ei].e*HA2EV*10000)/10000;
+                //     // cout << setw(8) << (double)elec_arr[ei].isse;
+                //     // cout << setw(8) << (double)elec_arr[ei].sc_type_counts[1];
+                //     // cout << setw(8) << (double)elec_arr[ei].secondary;
+                //     // cout << setw(8) << round(elec_arr[ei].angles[0]*10000)/10000;
+                //     // cout << setw(8) << round(elec_arr[ei].angles[1]*10000)/10000;
+                //     // cout << setw(8) << round(elec_arr[ei].depth*BOHR2ANG*10000)/10000 << endl;
                 //     ene_distrib.push_back({elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth});
-                }
+                // }
             } else {
                 nem++; // not emitted
             }
+            if (distrib) { ene_distrib.push_back({(double)ei,elec_arr[ei].e*HA2EV,(double)elec_arr[ei].isse,(double)elec_arr[ei].sc_type_counts[1],(double)elec_arr[ei].secondary,elec_arr[ei].angles[0],elec_arr[ei].angles[1],elec_arr[ei].depth,(double)elec_arr[ei].dead}); }
+
         }
         if (save_coords) { saveCoordVector(coord_vec,secondary_ind,checkName("mc_coords.plot")); }
-        // if (distrib) { saveVector(ene_distrib,checkName("mc_distrib.plot"),9); }
+        if (distrib)
+        {
+            string fname_1 = checkName("out/e" + to_string(int((erange-u0)*HA2EV)) + "stat.plot");
+            string fname_2 = checkName("out/e" + to_string(int((erange-u0)*HA2EV)) + "distrib.plot");
+            print("\n#");
+            cout << "# Saving statistics to " << fname_1 << " and " << fname_2 << "..." << endl;
+            saveVector(stat_arr,checkName(fname_1),8);
+            saveVector(ene_distrib,checkName(fname_2),9);
+        }
         print("\n#");
         cout << fixed << setprecision(4) << setfill(' ');
         cout << "# Energy[eV]     TEY TrueSEY   Bcksc DifPrim  eBcksc" << endl;
@@ -1718,11 +1735,17 @@ void saveVector(vector<vector<double> > arr, string filename, int ncols)
         {
             outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << endl;
         }
+    } else if (ncols==8)
+    {
+        for (size_t i = 0; i < arr.size(); i++)
+        {
+            outfile << int(arr[i][0]) << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << " " << setprecision(17) << arr[i][7]  << endl;
+        }
     } else if (ncols==9)
     {
         for (size_t i = 0; i < arr.size(); i++)
         {
-            outfile << setprecision(17) << arr[i][0] << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << " " << int(arr[i][7]) << " " << int(arr[i][8]) << endl;
+            outfile << int(arr[i][0]) << " " << setprecision(17) << arr[i][1] << " " << setprecision(17) << arr[i][2] << " " << setprecision(17) << arr[i][3] << " " << setprecision(17) << arr[i][4] << " " << setprecision(17) << arr[i][5] << " " << setprecision(17) << arr[i][6] << " " << setprecision(17) << arr[i][7] << " " << int(arr[i][8])  << endl;
         }
     } else { cerr << "Something went wrong with saveVector" << endl; exit(1); }
 }
