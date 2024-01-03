@@ -1451,7 +1451,7 @@ void readEpsFile(string filename)
                 {
                     ene_elf_tmp.pop_back();
                     // q_arr.push_back(ene_elf_tmp[ene_elf_tmp.size()-1][0]*HA2EV*BOHR2ANG);
-                    q_arr.push_back(ene_elf_tmp[ene_elf_tmp.size()-1][0]*HA2EV);
+                    q_arr.push_back(ene_elf_tmp[ene_elf_tmp.size()-1][0]*HA2EV*ANG2BOHR);
                     ene_elf_tmp.pop_back();
                     ene_elf.push_back(ene_elf_tmp);
                     ene_elf_tmp.clear();
